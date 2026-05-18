@@ -13,6 +13,7 @@ import { Route as AppRouteImport } from './routes/_app'
 import { Route as AppIndexRouteImport } from './routes/_app.index'
 import { Route as AppTeamRouteImport } from './routes/_app.team'
 import { Route as AppTasksRouteImport } from './routes/_app.tasks'
+import { Route as AppSettingsRouteImport } from './routes/_app.settings'
 import { Route as AppNotificationsRouteImport } from './routes/_app.notifications'
 import { Route as AppMeetingsRouteImport } from './routes/_app.meetings'
 import { Route as AppMeetingsIdRouteImport } from './routes/_app.meetings.$id'
@@ -36,6 +37,11 @@ const AppTasksRoute = AppTasksRouteImport.update({
   path: '/tasks',
   getParentRoute: () => AppRoute,
 } as any)
+const AppSettingsRoute = AppSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppNotificationsRoute = AppNotificationsRouteImport.update({
   id: '/notifications',
   path: '/notifications',
@@ -56,6 +62,7 @@ export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/meetings': typeof AppMeetingsRouteWithChildren
   '/notifications': typeof AppNotificationsRoute
+  '/settings': typeof AppSettingsRoute
   '/tasks': typeof AppTasksRoute
   '/team': typeof AppTeamRoute
   '/meetings/$id': typeof AppMeetingsIdRoute
@@ -63,6 +70,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/meetings': typeof AppMeetingsRouteWithChildren
   '/notifications': typeof AppNotificationsRoute
+  '/settings': typeof AppSettingsRoute
   '/tasks': typeof AppTasksRoute
   '/team': typeof AppTeamRoute
   '/': typeof AppIndexRoute
@@ -73,6 +81,7 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/_app/meetings': typeof AppMeetingsRouteWithChildren
   '/_app/notifications': typeof AppNotificationsRoute
+  '/_app/settings': typeof AppSettingsRoute
   '/_app/tasks': typeof AppTasksRoute
   '/_app/team': typeof AppTeamRoute
   '/_app/': typeof AppIndexRoute
@@ -84,6 +93,7 @@ export interface FileRouteTypes {
     | '/'
     | '/meetings'
     | '/notifications'
+    | '/settings'
     | '/tasks'
     | '/team'
     | '/meetings/$id'
@@ -91,6 +101,7 @@ export interface FileRouteTypes {
   to:
     | '/meetings'
     | '/notifications'
+    | '/settings'
     | '/tasks'
     | '/team'
     | '/'
@@ -100,6 +111,7 @@ export interface FileRouteTypes {
     | '/_app'
     | '/_app/meetings'
     | '/_app/notifications'
+    | '/_app/settings'
     | '/_app/tasks'
     | '/_app/team'
     | '/_app/'
@@ -138,6 +150,13 @@ declare module '@tanstack/react-router' {
       path: '/tasks'
       fullPath: '/tasks'
       preLoaderRoute: typeof AppTasksRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/settings': {
+      id: '/_app/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AppSettingsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/notifications': {
@@ -179,6 +198,7 @@ const AppMeetingsRouteWithChildren = AppMeetingsRoute._addFileChildren(
 interface AppRouteChildren {
   AppMeetingsRoute: typeof AppMeetingsRouteWithChildren
   AppNotificationsRoute: typeof AppNotificationsRoute
+  AppSettingsRoute: typeof AppSettingsRoute
   AppTasksRoute: typeof AppTasksRoute
   AppTeamRoute: typeof AppTeamRoute
   AppIndexRoute: typeof AppIndexRoute
@@ -187,6 +207,7 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppMeetingsRoute: AppMeetingsRouteWithChildren,
   AppNotificationsRoute: AppNotificationsRoute,
+  AppSettingsRoute: AppSettingsRoute,
   AppTasksRoute: AppTasksRoute,
   AppTeamRoute: AppTeamRoute,
   AppIndexRoute: AppIndexRoute,
