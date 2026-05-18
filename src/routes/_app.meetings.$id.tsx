@@ -50,7 +50,7 @@ function MeetingDetail() {
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <span>{meeting.date}</span><span>·</span><span>{meeting.duration}</span><span>·</span>
             <Badge variant="secondary">{meeting.recordingType}</Badge>
-            {meeting.tags.map((t) => <Badge key={t} variant="outline">{t}</Badge>)}
+            {meeting.tags.map((t: string) => <Badge key={t} variant="outline">{t}</Badge>)}
           </div>
         </div>
         <div className="flex gap-2">
@@ -76,7 +76,7 @@ function MeetingDetail() {
             </div>
           </div>
           <div className="flex -space-x-2">
-            {meeting.participants.map((p) => (
+            {meeting.participants.map((p: string) => (
               <Avatar key={p} className="h-8 w-8 border-2 border-card">
                 <AvatarFallback className="bg-muted text-xs">{p}</AvatarFallback>
               </Avatar>
