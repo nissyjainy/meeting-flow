@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AppIndexRouteImport } from './routes/_app.index'
+import { Route as AppTasksRouteImport } from './routes/_app.tasks'
 import { Route as AppMeetingsRouteImport } from './routes/_app.meetings'
 import { Route as AppMeetingsIdRouteImport } from './routes/_app.meetings.$id'
 
@@ -21,6 +22,11 @@ const AppRoute = AppRouteImport.update({
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppTasksRoute = AppTasksRouteImport.update({
+  id: '/tasks',
+  path: '/tasks',
   getParentRoute: () => AppRoute,
 } as any)
 const AppMeetingsRoute = AppMeetingsRouteImport.update({
@@ -37,10 +43,12 @@ const AppMeetingsIdRoute = AppMeetingsIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/meetings': typeof AppMeetingsRouteWithChildren
+  '/tasks': typeof AppTasksRoute
   '/meetings/$id': typeof AppMeetingsIdRoute
 }
 export interface FileRoutesByTo {
   '/meetings': typeof AppMeetingsRouteWithChildren
+  '/tasks': typeof AppTasksRoute
   '/': typeof AppIndexRoute
   '/meetings/$id': typeof AppMeetingsIdRoute
 }
@@ -48,15 +56,22 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
   '/_app/meetings': typeof AppMeetingsRouteWithChildren
+  '/_app/tasks': typeof AppTasksRoute
   '/_app/': typeof AppIndexRoute
   '/_app/meetings/$id': typeof AppMeetingsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/meetings' | '/meetings/$id'
+  fullPaths: '/' | '/meetings' | '/tasks' | '/meetings/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/meetings' | '/' | '/meetings/$id'
-  id: '__root__' | '/_app' | '/_app/meetings' | '/_app/' | '/_app/meetings/$id'
+  to: '/meetings' | '/tasks' | '/' | '/meetings/$id'
+  id:
+    | '__root__'
+    | '/_app'
+    | '/_app/meetings'
+    | '/_app/tasks'
+    | '/_app/'
+    | '/_app/meetings/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -77,6 +92,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/tasks': {
+      id: '/_app/tasks'
+      path: '/tasks'
+      fullPath: '/tasks'
+      preLoaderRoute: typeof AppTasksRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/meetings': {
@@ -110,11 +132,13 @@ const AppMeetingsRouteWithChildren = AppMeetingsRoute._addFileChildren(
 
 interface AppRouteChildren {
   AppMeetingsRoute: typeof AppMeetingsRouteWithChildren
+  AppTasksRoute: typeof AppTasksRoute
   AppIndexRoute: typeof AppIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppMeetingsRoute: AppMeetingsRouteWithChildren,
+  AppTasksRoute: AppTasksRoute,
   AppIndexRoute: AppIndexRoute,
 }
 
@@ -126,3 +150,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
