@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AppIndexRouteImport } from './routes/_app.index'
 import { Route as AppMeetingsRouteImport } from './routes/_app.meetings'
+import { Route as AppMeetingsIdRouteImport } from './routes/_app.meetings.$id'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -27,27 +28,35 @@ const AppMeetingsRoute = AppMeetingsRouteImport.update({
   path: '/meetings',
   getParentRoute: () => AppRoute,
 } as any)
+const AppMeetingsIdRoute = AppMeetingsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AppMeetingsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
-  '/meetings': typeof AppMeetingsRoute
+  '/meetings': typeof AppMeetingsRouteWithChildren
+  '/meetings/$id': typeof AppMeetingsIdRoute
 }
 export interface FileRoutesByTo {
-  '/meetings': typeof AppMeetingsRoute
+  '/meetings': typeof AppMeetingsRouteWithChildren
   '/': typeof AppIndexRoute
+  '/meetings/$id': typeof AppMeetingsIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
-  '/_app/meetings': typeof AppMeetingsRoute
+  '/_app/meetings': typeof AppMeetingsRouteWithChildren
   '/_app/': typeof AppIndexRoute
+  '/_app/meetings/$id': typeof AppMeetingsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/meetings'
+  fullPaths: '/' | '/meetings' | '/meetings/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/meetings' | '/'
-  id: '__root__' | '/_app' | '/_app/meetings' | '/_app/'
+  to: '/meetings' | '/' | '/meetings/$id'
+  id: '__root__' | '/_app' | '/_app/meetings' | '/_app/' | '/_app/meetings/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -77,16 +86,35 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMeetingsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/meetings/$id': {
+      id: '/_app/meetings/$id'
+      path: '/$id'
+      fullPath: '/meetings/$id'
+      preLoaderRoute: typeof AppMeetingsIdRouteImport
+      parentRoute: typeof AppMeetingsRoute
+    }
   }
 }
 
+interface AppMeetingsRouteChildren {
+  AppMeetingsIdRoute: typeof AppMeetingsIdRoute
+}
+
+const AppMeetingsRouteChildren: AppMeetingsRouteChildren = {
+  AppMeetingsIdRoute: AppMeetingsIdRoute,
+}
+
+const AppMeetingsRouteWithChildren = AppMeetingsRoute._addFileChildren(
+  AppMeetingsRouteChildren,
+)
+
 interface AppRouteChildren {
-  AppMeetingsRoute: typeof AppMeetingsRoute
+  AppMeetingsRoute: typeof AppMeetingsRouteWithChildren
   AppIndexRoute: typeof AppIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
-  AppMeetingsRoute: AppMeetingsRoute,
+  AppMeetingsRoute: AppMeetingsRouteWithChildren,
   AppIndexRoute: AppIndexRoute,
 }
 
