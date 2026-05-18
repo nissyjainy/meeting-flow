@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AppIndexRouteImport } from './routes/_app.index'
 import { Route as AppTasksRouteImport } from './routes/_app.tasks'
+import { Route as AppNotificationsRouteImport } from './routes/_app.notifications'
 import { Route as AppMeetingsRouteImport } from './routes/_app.meetings'
 import { Route as AppMeetingsIdRouteImport } from './routes/_app.meetings.$id'
 
@@ -29,6 +30,11 @@ const AppTasksRoute = AppTasksRouteImport.update({
   path: '/tasks',
   getParentRoute: () => AppRoute,
 } as any)
+const AppNotificationsRoute = AppNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppMeetingsRoute = AppMeetingsRouteImport.update({
   id: '/meetings',
   path: '/meetings',
@@ -43,11 +49,13 @@ const AppMeetingsIdRoute = AppMeetingsIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/meetings': typeof AppMeetingsRouteWithChildren
+  '/notifications': typeof AppNotificationsRoute
   '/tasks': typeof AppTasksRoute
   '/meetings/$id': typeof AppMeetingsIdRoute
 }
 export interface FileRoutesByTo {
   '/meetings': typeof AppMeetingsRouteWithChildren
+  '/notifications': typeof AppNotificationsRoute
   '/tasks': typeof AppTasksRoute
   '/': typeof AppIndexRoute
   '/meetings/$id': typeof AppMeetingsIdRoute
@@ -56,19 +64,21 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
   '/_app/meetings': typeof AppMeetingsRouteWithChildren
+  '/_app/notifications': typeof AppNotificationsRoute
   '/_app/tasks': typeof AppTasksRoute
   '/_app/': typeof AppIndexRoute
   '/_app/meetings/$id': typeof AppMeetingsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/meetings' | '/tasks' | '/meetings/$id'
+  fullPaths: '/' | '/meetings' | '/notifications' | '/tasks' | '/meetings/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/meetings' | '/tasks' | '/' | '/meetings/$id'
+  to: '/meetings' | '/notifications' | '/tasks' | '/' | '/meetings/$id'
   id:
     | '__root__'
     | '/_app'
     | '/_app/meetings'
+    | '/_app/notifications'
     | '/_app/tasks'
     | '/_app/'
     | '/_app/meetings/$id'
@@ -99,6 +109,13 @@ declare module '@tanstack/react-router' {
       path: '/tasks'
       fullPath: '/tasks'
       preLoaderRoute: typeof AppTasksRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/notifications': {
+      id: '/_app/notifications'
+      path: '/notifications'
+      fullPath: '/notifications'
+      preLoaderRoute: typeof AppNotificationsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/meetings': {
@@ -132,12 +149,14 @@ const AppMeetingsRouteWithChildren = AppMeetingsRoute._addFileChildren(
 
 interface AppRouteChildren {
   AppMeetingsRoute: typeof AppMeetingsRouteWithChildren
+  AppNotificationsRoute: typeof AppNotificationsRoute
   AppTasksRoute: typeof AppTasksRoute
   AppIndexRoute: typeof AppIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppMeetingsRoute: AppMeetingsRouteWithChildren,
+  AppNotificationsRoute: AppNotificationsRoute,
   AppTasksRoute: AppTasksRoute,
   AppIndexRoute: AppIndexRoute,
 }
