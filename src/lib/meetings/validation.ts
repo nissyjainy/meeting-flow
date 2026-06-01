@@ -1,0 +1,86 @@
+import {
+  ALLOWED_EXTENSIONS,
+  ALLOWED_MIME_TYPES,
+  MAX_MEETING_FILE_BYTES,
+} from "./constants";
+
+export type FileValidationResult =
+  | { valid: true }
+  | { valid: false; message: string };
+
+function getExtension(fileName: string): string {
+  const dot = fileName.lastIndexOf(".");
+  return dot >= 0 ? fileName.slice(dot).toLowerCase() : "";
+}
+
+export function validateMeetingFile(file: File): FileValidationResult {
+  if (!file || file.size === 0) {
+    return { valid: false, message: "File is empty." };
+  }
+
+  if (file.size > MAX_MEETING_FILE_BYTES) {
+    return {
+      valid: false,
+      message: `File exceeds the ${Math.round(MAX_MEETING_FILE_BYTES / (1024 * 1024))} MB limit.`,
+    };
+  }
+
+  const extension = getExtension(file.name);
+  if (!ALLOWED_EXTENSIONS.includes(extension as (typeof ALLOWED_EXTENSIONS)[number])) {
+    return {
+      valid: false,
+      message: `Unsupported format. Allowed: ${ALLOWED_EXTENSIONS.join(", ")}`,
+    };
+  }
+
+  if (file.type && !ALLOWED_MIME_TYPES.has(file.type)) {
+    return {
+      valid: false,
+      message: `Unsupported MIME type (${file.type}). Use mp3, mp4, wav, or m4a.`,
+    };
+  }
+
+  return { valid: true };
+}
+
+export function mimeTypeFromFileName(fileName: string): string {
+  const ext = getExtension(fileName);
+  const map: Record<string, string> = {
+    ".mp3": "audio/mpeg",
+    ".mp4": "video/mp4",
+    ".wav": "audio/wav",
+    ".m4a": "audio/m4a",
+  };
+  return map[ext] ?? "application/octet-stream";
+}
+
+export function titleFromFileName(fileName: string): string {
+  const base = fileName.replace(/\.[^/.]+$/, "");
+  return base.replace(/[-_]+/g, " ").trim() || "Untitled meeting";
+}
+
+export function sanitizeStorageFileName(fileName: string): string {
+  return fileName.replace(/[^\w.\-() ]+/g, "_").replace(/\s+/g, "_");
+}
+
+export function formatFileSize(bytes: number | null | undefined): string {
+  if (bytes == null || bytes <= 0) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+export function formatMeetingDate(iso: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(iso));
+}
+
+export function fileExtensionLabel(fileName: string): string {
+  const ext = getExtension(fileName).replace(".", "").toUpperCase();
+  return ext || "FILE";
+}

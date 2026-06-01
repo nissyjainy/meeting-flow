@@ -1,7 +1,17 @@
+import { ensureServerEnvLoaded } from "./lib/server-env.node";
+
+ensureServerEnvLoaded();
+console.log("[app-boot] server.ts entry loaded (Node/Worker)");
+validateServerStartupEnv("server.ts");
+
 import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { bindWorkerEnv } from "./lib/server-env";
+import { validateServerStartupEnv } from "./lib/startup-env-validation";
+import { getReminderConfig } from "./lib/reminders/reminder-env";
+import { logReminderEnvStatus } from "./lib/reminders/reminder-env";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -66,9 +76,42 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
   return brandedErrorResponse();
 }
 
+async function handleCronTaskReminders(request: Request): Promise<Response | null> {
+  const url = new URL(request.url);
+  if (url.pathname !== "/api/cron/task-reminders" || request.method !== "POST") {
+    return null;
+  }
+
+  const config = getReminderConfig();
+  const authHeader = request.headers.get("authorization") ?? "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+
+  if (!config.cronSecret || token !== config.cronSecret) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { runScheduledTaskReminderEmails } = await import(
+    "./lib/reminders/task-reminder-pipeline.server"
+  );
+  const result = await runScheduledTaskReminderEmails();
+  return Response.json(result);
+}
+
+let envLogged = false;
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      bindWorkerEnv(env);
+      if (!envLogged) {
+        envLogged = true;
+        console.log("[app-boot] fetch handler ready — runtime: server");
+        logReminderEnvStatus("server-boot");
+      }
+
+      const cronResponse = await handleCronTaskReminders(request);
+      if (cronResponse) return cronResponse;
+
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);
@@ -76,5 +119,18 @@ export default {
       console.error(error);
       return brandedErrorResponse();
     }
+  },
+  async scheduled(
+    _event: unknown,
+    env: unknown,
+    ctx: { waitUntil: (promise: Promise<unknown>) => void },
+  ) {
+    bindWorkerEnv(env);
+    const { reminderLog } = await import("./lib/reminders/reminder-debug");
+    reminderLog("scheduler triggered — Cloudflare cron");
+    const { runScheduledTaskReminderEmails } = await import(
+      "./lib/reminders/task-reminder-pipeline.server"
+    );
+    ctx.waitUntil(runScheduledTaskReminderEmails());
   },
 };

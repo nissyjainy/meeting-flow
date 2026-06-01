@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { tasks as initialTasks, notifications as initialNotifications, type Task, type TaskStatus, type AppNotification } from "@/lib/mock-data";
+import { persistNotificationReadIds, readNotificationReadIds } from "@/lib/notifications/read-state";
 
 type Theme = "light" | "dark";
 
@@ -10,14 +10,19 @@ interface AppState {
 
   copilotOpen: boolean;
   toggleCopilot: () => void;
+  copilotFocusMeetingId: string | null;
+  copilotFocusMeetingTitle: string | null;
+  copilotFocusRequestId: number;
+  openCopilotForMeeting: (meetingId: string, meetingTitle?: string) => void;
+  clearCopilotFocusMeeting: () => void;
 
-  tasks: Task[];
-  moveTask: (id: string, status: TaskStatus) => void;
-  addTask: (task: Omit<Task, "id">) => void;
+  notificationReadIds: Set<string>;
+  markNotificationRead: (id: string) => void;
+  markAllNotificationsRead: (ids: string[]) => void;
+}
 
-  notifications: AppNotification[];
-  markAllRead: () => void;
-  markRead: (id: string) => void;
+function persistReadIds(readIds: Set<string>) {
+  persistNotificationReadIds(readIds);
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -40,16 +45,35 @@ export const useAppStore = create<AppState>((set) => ({
 
   copilotOpen: true,
   toggleCopilot: () => set((s) => ({ copilotOpen: !s.copilotOpen })),
-
-  tasks: initialTasks,
-  moveTask: (id, status) =>
+  copilotFocusMeetingId: null,
+  copilotFocusMeetingTitle: null,
+  copilotFocusRequestId: 0,
+  openCopilotForMeeting: (meetingId, meetingTitle) =>
     set((s) => ({
-      tasks: s.tasks.map((t) => (t.id === id ? { ...t, status, progress: status === "done" ? 100 : t.progress } : t)),
+      copilotOpen: true,
+      copilotFocusMeetingId: meetingId,
+      copilotFocusMeetingTitle: meetingTitle?.trim() || null,
+      copilotFocusRequestId: s.copilotFocusRequestId + 1,
     })),
-  addTask: (task) =>
-    set((s) => ({ tasks: [{ ...task, id: `tk${Date.now()}` }, ...s.tasks] })),
+  clearCopilotFocusMeeting: () =>
+    set({ copilotFocusMeetingId: null, copilotFocusMeetingTitle: null }),
 
-  notifications: initialNotifications,
-  markAllRead: () => set((s) => ({ notifications: s.notifications.map((n) => ({ ...n, read: true })) })),
-  markRead: (id) => set((s) => ({ notifications: s.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)) })),
+  notificationReadIds: readNotificationReadIds(),
+  markNotificationRead: (id) =>
+    set((state) => {
+      if (state.notificationReadIds.has(id)) return state;
+      const notificationReadIds = new Set(state.notificationReadIds);
+      notificationReadIds.add(id);
+      persistReadIds(notificationReadIds);
+      return { notificationReadIds };
+    }),
+  markAllNotificationsRead: (ids) =>
+    set((state) => {
+      const notificationReadIds = new Set(state.notificationReadIds);
+      for (const id of ids) {
+        notificationReadIds.add(id);
+      }
+      persistReadIds(notificationReadIds);
+      return { notificationReadIds };
+    }),
 }));

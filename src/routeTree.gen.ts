@@ -10,19 +10,34 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as LogoutRouteImport } from './routes/logout'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AppIndexRouteImport } from './routes/_app.index'
+import { Route as AppTeamInsightsRouteImport } from './routes/_app.team-insights'
 import { Route as AppTeamRouteImport } from './routes/_app.team'
 import { Route as AppTasksRouteImport } from './routes/_app.tasks'
 import { Route as AppSettingsRouteImport } from './routes/_app.settings'
 import { Route as AppNotificationsRouteImport } from './routes/_app.notifications'
 import { Route as AppMeetingsRouteImport } from './routes/_app.meetings'
+import { Route as AppExecutionHealthRouteImport } from './routes/_app.execution-health'
+import { Route as AppAnalyticsRouteImport } from './routes/_app.analytics'
+import { Route as AppMeetingsIndexRouteImport } from './routes/_app.meetings.index'
+import { Route as ApiCronTaskRemindersRouteImport } from './routes/api.cron.task-reminders'
 import { Route as AppMeetingsIdRouteImport } from './routes/_app.meetings.$id'
+import { Route as ApiIntegrationsGoogleDisconnectRouteImport } from './routes/api.integrations.google.disconnect'
+import { Route as ApiIntegrationsGoogleConnectRouteImport } from './routes/api.integrations.google.connect'
+import { Route as ApiIntegrationsGoogleCallbackRouteImport } from './routes/api.integrations.google.callback'
+import { Route as AppMeetingsScheduledIdRouteImport } from './routes/_app.meetings.scheduled.$id'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LogoutRoute = LogoutRouteImport.update({
+  id: '/logout',
+  path: '/logout',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -37,6 +52,11 @@ const AppRoute = AppRouteImport.update({
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppTeamInsightsRoute = AppTeamInsightsRouteImport.update({
+  id: '/team-insights',
+  path: '/team-insights',
   getParentRoute: () => AppRoute,
 } as any)
 const AppTeamRoute = AppTeamRouteImport.update({
@@ -64,88 +84,194 @@ const AppMeetingsRoute = AppMeetingsRouteImport.update({
   path: '/meetings',
   getParentRoute: () => AppRoute,
 } as any)
+const AppExecutionHealthRoute = AppExecutionHealthRouteImport.update({
+  id: '/execution-health',
+  path: '/execution-health',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAnalyticsRoute = AppAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMeetingsIndexRoute = AppMeetingsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppMeetingsRoute,
+} as any)
+const ApiCronTaskRemindersRoute = ApiCronTaskRemindersRouteImport.update({
+  id: '/api/cron/task-reminders',
+  path: '/api/cron/task-reminders',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppMeetingsIdRoute = AppMeetingsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
+  getParentRoute: () => AppMeetingsRoute,
+} as any)
+const ApiIntegrationsGoogleDisconnectRoute =
+  ApiIntegrationsGoogleDisconnectRouteImport.update({
+    id: '/api/integrations/google/disconnect',
+    path: '/api/integrations/google/disconnect',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiIntegrationsGoogleConnectRoute =
+  ApiIntegrationsGoogleConnectRouteImport.update({
+    id: '/api/integrations/google/connect',
+    path: '/api/integrations/google/connect',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiIntegrationsGoogleCallbackRoute =
+  ApiIntegrationsGoogleCallbackRouteImport.update({
+    id: '/api/integrations/google/callback',
+    path: '/api/integrations/google/callback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const AppMeetingsScheduledIdRoute = AppMeetingsScheduledIdRouteImport.update({
+  id: '/scheduled/$id',
+  path: '/scheduled/$id',
   getParentRoute: () => AppMeetingsRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/login': typeof LoginRoute
+  '/logout': typeof LogoutRoute
   '/signup': typeof SignupRoute
+  '/analytics': typeof AppAnalyticsRoute
+  '/execution-health': typeof AppExecutionHealthRoute
   '/meetings': typeof AppMeetingsRouteWithChildren
   '/notifications': typeof AppNotificationsRoute
   '/settings': typeof AppSettingsRoute
   '/tasks': typeof AppTasksRoute
   '/team': typeof AppTeamRoute
+  '/team-insights': typeof AppTeamInsightsRoute
   '/meetings/$id': typeof AppMeetingsIdRoute
+  '/api/cron/task-reminders': typeof ApiCronTaskRemindersRoute
+  '/meetings/': typeof AppMeetingsIndexRoute
+  '/meetings/scheduled/$id': typeof AppMeetingsScheduledIdRoute
+  '/api/integrations/google/callback': typeof ApiIntegrationsGoogleCallbackRoute
+  '/api/integrations/google/connect': typeof ApiIntegrationsGoogleConnectRoute
+  '/api/integrations/google/disconnect': typeof ApiIntegrationsGoogleDisconnectRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
+  '/logout': typeof LogoutRoute
   '/signup': typeof SignupRoute
-  '/meetings': typeof AppMeetingsRouteWithChildren
+  '/analytics': typeof AppAnalyticsRoute
+  '/execution-health': typeof AppExecutionHealthRoute
   '/notifications': typeof AppNotificationsRoute
   '/settings': typeof AppSettingsRoute
   '/tasks': typeof AppTasksRoute
   '/team': typeof AppTeamRoute
+  '/team-insights': typeof AppTeamInsightsRoute
   '/': typeof AppIndexRoute
   '/meetings/$id': typeof AppMeetingsIdRoute
+  '/api/cron/task-reminders': typeof ApiCronTaskRemindersRoute
+  '/meetings': typeof AppMeetingsIndexRoute
+  '/meetings/scheduled/$id': typeof AppMeetingsScheduledIdRoute
+  '/api/integrations/google/callback': typeof ApiIntegrationsGoogleCallbackRoute
+  '/api/integrations/google/connect': typeof ApiIntegrationsGoogleConnectRoute
+  '/api/integrations/google/disconnect': typeof ApiIntegrationsGoogleDisconnectRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
+  '/logout': typeof LogoutRoute
   '/signup': typeof SignupRoute
+  '/_app/analytics': typeof AppAnalyticsRoute
+  '/_app/execution-health': typeof AppExecutionHealthRoute
   '/_app/meetings': typeof AppMeetingsRouteWithChildren
   '/_app/notifications': typeof AppNotificationsRoute
   '/_app/settings': typeof AppSettingsRoute
   '/_app/tasks': typeof AppTasksRoute
   '/_app/team': typeof AppTeamRoute
+  '/_app/team-insights': typeof AppTeamInsightsRoute
   '/_app/': typeof AppIndexRoute
   '/_app/meetings/$id': typeof AppMeetingsIdRoute
+  '/api/cron/task-reminders': typeof ApiCronTaskRemindersRoute
+  '/_app/meetings/': typeof AppMeetingsIndexRoute
+  '/_app/meetings/scheduled/$id': typeof AppMeetingsScheduledIdRoute
+  '/api/integrations/google/callback': typeof ApiIntegrationsGoogleCallbackRoute
+  '/api/integrations/google/connect': typeof ApiIntegrationsGoogleConnectRoute
+  '/api/integrations/google/disconnect': typeof ApiIntegrationsGoogleDisconnectRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/login'
+    | '/logout'
     | '/signup'
+    | '/analytics'
+    | '/execution-health'
     | '/meetings'
     | '/notifications'
     | '/settings'
     | '/tasks'
     | '/team'
+    | '/team-insights'
     | '/meetings/$id'
+    | '/api/cron/task-reminders'
+    | '/meetings/'
+    | '/meetings/scheduled/$id'
+    | '/api/integrations/google/callback'
+    | '/api/integrations/google/connect'
+    | '/api/integrations/google/disconnect'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
+    | '/logout'
     | '/signup'
-    | '/meetings'
+    | '/analytics'
+    | '/execution-health'
     | '/notifications'
     | '/settings'
     | '/tasks'
     | '/team'
+    | '/team-insights'
     | '/'
     | '/meetings/$id'
+    | '/api/cron/task-reminders'
+    | '/meetings'
+    | '/meetings/scheduled/$id'
+    | '/api/integrations/google/callback'
+    | '/api/integrations/google/connect'
+    | '/api/integrations/google/disconnect'
   id:
     | '__root__'
     | '/_app'
     | '/login'
+    | '/logout'
     | '/signup'
+    | '/_app/analytics'
+    | '/_app/execution-health'
     | '/_app/meetings'
     | '/_app/notifications'
     | '/_app/settings'
     | '/_app/tasks'
     | '/_app/team'
+    | '/_app/team-insights'
     | '/_app/'
     | '/_app/meetings/$id'
+    | '/api/cron/task-reminders'
+    | '/_app/meetings/'
+    | '/_app/meetings/scheduled/$id'
+    | '/api/integrations/google/callback'
+    | '/api/integrations/google/connect'
+    | '/api/integrations/google/disconnect'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
+  LogoutRoute: typeof LogoutRoute
   SignupRoute: typeof SignupRoute
+  ApiCronTaskRemindersRoute: typeof ApiCronTaskRemindersRoute
+  ApiIntegrationsGoogleCallbackRoute: typeof ApiIntegrationsGoogleCallbackRoute
+  ApiIntegrationsGoogleConnectRoute: typeof ApiIntegrationsGoogleConnectRoute
+  ApiIntegrationsGoogleDisconnectRoute: typeof ApiIntegrationsGoogleDisconnectRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -155,6 +281,13 @@ declare module '@tanstack/react-router' {
       path: '/signup'
       fullPath: '/signup'
       preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/logout': {
+      id: '/logout'
+      path: '/logout'
+      fullPath: '/logout'
+      preLoaderRoute: typeof LogoutRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -176,6 +309,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/team-insights': {
+      id: '/_app/team-insights'
+      path: '/team-insights'
+      fullPath: '/team-insights'
+      preLoaderRoute: typeof AppTeamInsightsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/team': {
@@ -213,6 +353,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMeetingsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/execution-health': {
+      id: '/_app/execution-health'
+      path: '/execution-health'
+      fullPath: '/execution-health'
+      preLoaderRoute: typeof AppExecutionHealthRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/analytics': {
+      id: '/_app/analytics'
+      path: '/analytics'
+      fullPath: '/analytics'
+      preLoaderRoute: typeof AppAnalyticsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/meetings/': {
+      id: '/_app/meetings/'
+      path: '/'
+      fullPath: '/meetings/'
+      preLoaderRoute: typeof AppMeetingsIndexRouteImport
+      parentRoute: typeof AppMeetingsRoute
+    }
+    '/api/cron/task-reminders': {
+      id: '/api/cron/task-reminders'
+      path: '/api/cron/task-reminders'
+      fullPath: '/api/cron/task-reminders'
+      preLoaderRoute: typeof ApiCronTaskRemindersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/meetings/$id': {
       id: '/_app/meetings/$id'
       path: '/$id'
@@ -220,15 +388,47 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMeetingsIdRouteImport
       parentRoute: typeof AppMeetingsRoute
     }
+    '/api/integrations/google/disconnect': {
+      id: '/api/integrations/google/disconnect'
+      path: '/api/integrations/google/disconnect'
+      fullPath: '/api/integrations/google/disconnect'
+      preLoaderRoute: typeof ApiIntegrationsGoogleDisconnectRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/integrations/google/connect': {
+      id: '/api/integrations/google/connect'
+      path: '/api/integrations/google/connect'
+      fullPath: '/api/integrations/google/connect'
+      preLoaderRoute: typeof ApiIntegrationsGoogleConnectRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/integrations/google/callback': {
+      id: '/api/integrations/google/callback'
+      path: '/api/integrations/google/callback'
+      fullPath: '/api/integrations/google/callback'
+      preLoaderRoute: typeof ApiIntegrationsGoogleCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_app/meetings/scheduled/$id': {
+      id: '/_app/meetings/scheduled/$id'
+      path: '/scheduled/$id'
+      fullPath: '/meetings/scheduled/$id'
+      preLoaderRoute: typeof AppMeetingsScheduledIdRouteImport
+      parentRoute: typeof AppMeetingsRoute
+    }
   }
 }
 
 interface AppMeetingsRouteChildren {
   AppMeetingsIdRoute: typeof AppMeetingsIdRoute
+  AppMeetingsIndexRoute: typeof AppMeetingsIndexRoute
+  AppMeetingsScheduledIdRoute: typeof AppMeetingsScheduledIdRoute
 }
 
 const AppMeetingsRouteChildren: AppMeetingsRouteChildren = {
   AppMeetingsIdRoute: AppMeetingsIdRoute,
+  AppMeetingsIndexRoute: AppMeetingsIndexRoute,
+  AppMeetingsScheduledIdRoute: AppMeetingsScheduledIdRoute,
 }
 
 const AppMeetingsRouteWithChildren = AppMeetingsRoute._addFileChildren(
@@ -236,20 +436,26 @@ const AppMeetingsRouteWithChildren = AppMeetingsRoute._addFileChildren(
 )
 
 interface AppRouteChildren {
+  AppAnalyticsRoute: typeof AppAnalyticsRoute
+  AppExecutionHealthRoute: typeof AppExecutionHealthRoute
   AppMeetingsRoute: typeof AppMeetingsRouteWithChildren
   AppNotificationsRoute: typeof AppNotificationsRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppTasksRoute: typeof AppTasksRoute
   AppTeamRoute: typeof AppTeamRoute
+  AppTeamInsightsRoute: typeof AppTeamInsightsRoute
   AppIndexRoute: typeof AppIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppAnalyticsRoute: AppAnalyticsRoute,
+  AppExecutionHealthRoute: AppExecutionHealthRoute,
   AppMeetingsRoute: AppMeetingsRouteWithChildren,
   AppNotificationsRoute: AppNotificationsRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppTasksRoute: AppTasksRoute,
   AppTeamRoute: AppTeamRoute,
+  AppTeamInsightsRoute: AppTeamInsightsRoute,
   AppIndexRoute: AppIndexRoute,
 }
 
@@ -258,8 +464,23 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
+  LogoutRoute: LogoutRoute,
   SignupRoute: SignupRoute,
+  ApiCronTaskRemindersRoute: ApiCronTaskRemindersRoute,
+  ApiIntegrationsGoogleCallbackRoute: ApiIntegrationsGoogleCallbackRoute,
+  ApiIntegrationsGoogleConnectRoute: ApiIntegrationsGoogleConnectRoute,
+  ApiIntegrationsGoogleDisconnectRoute: ApiIntegrationsGoogleDisconnectRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

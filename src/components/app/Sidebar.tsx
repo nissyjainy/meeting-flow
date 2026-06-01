@@ -9,14 +9,22 @@ import {
   Bell,
   Sparkles,
   Plus,
+  Loader2,
+  BarChart3,
+  LineChart,
+  Activity,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useMeetingUploadTrigger } from "@/providers/meeting-upload-provider";
 
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/meetings", label: "Meetings", icon: Video },
   { to: "/tasks", label: "Tasks", icon: ListChecks },
+  { to: "/team-insights", label: "Team Insights", icon: BarChart3 },
+  { to: "/execution-health", label: "Execution Health", icon: Activity },
+  { to: "/analytics", label: "Analytics", icon: LineChart },
   { to: "/notifications", label: "Notifications", icon: Bell },
   { to: "/team", label: "Team", icon: Users },
   { to: "/settings", label: "Settings", icon: Settings },
@@ -24,6 +32,7 @@ const nav = [
 
 export function AppSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { openUploadDialog, isProcessing } = useMeetingUploadTrigger();
 
   return (
     <aside className="hidden md:flex w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar">
@@ -38,8 +47,19 @@ export function AppSidebar() {
       </div>
 
       <div className="p-3">
-        <Button size="sm" className="w-full justify-start gap-2 bg-gradient-primary text-primary-foreground hover:opacity-90">
-          <Plus className="h-4 w-4" /> New meeting
+        <Button
+          type="button"
+          size="sm"
+          className="w-full justify-start gap-2 bg-gradient-primary text-primary-foreground hover:opacity-90"
+          onClick={() => openUploadDialog()}
+          disabled={isProcessing}
+        >
+          {isProcessing ? (
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+          ) : (
+            <Plus className="h-4 w-4" aria-hidden />
+          )}
+          {isProcessing ? "Processing…" : "New meeting"}
         </Button>
       </div>
 
@@ -70,19 +90,6 @@ export function AppSidebar() {
           );
         })}
       </nav>
-
-      <div className="m-3 rounded-xl border border-sidebar-border bg-gradient-subtle p-4">
-        <div className="flex items-center gap-2 text-xs font-medium text-sidebar-foreground">
-          <Sparkles className="h-3.5 w-3.5 text-primary" />
-          Upgrade to Enterprise
-        </div>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Unlock SSO, audit logs and unlimited transcription.
-        </p>
-        <Button size="sm" variant="outline" className="mt-3 w-full">
-          See plans
-        </Button>
-      </div>
     </aside>
   );
 }
