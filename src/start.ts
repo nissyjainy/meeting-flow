@@ -9,6 +9,8 @@ let appBootLogged = false;
 const supabaseMiddleware = createMiddleware().server(async ({ next }) => {
   if (!appBootLogged) {
     appBootLogged = true;
+    const { ensureServerEnvLoaded } = await import("./lib/server-env.node");
+    ensureServerEnvLoaded();
     console.log("[app-boot] TanStack Start server middleware active");
     validateServerStartupEnv("start-middleware");
     try {

@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { readServerEnv } from "@/lib/server-env";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { MEETINGS_BUCKET } from "./constants";
 import { uploadDebug, uploadDebugError, uploadDebugReturn } from "./upload-debug";
@@ -16,8 +17,8 @@ type GroqWhisperResponse = {
 function getGroqConfig() {
   uploadDebug("transcription getGroqConfig started (server)");
   try {
-    const apiKey = process.env.GROQ_API_KEY;
-    const model = process.env.GROQ_WHISPER_MODEL || "whisper-large-v3";
+    const apiKey = readServerEnv("GROQ_API_KEY");
+    const model = readServerEnv("GROQ_WHISPER_MODEL") || "whisper-large-v3";
 
     if (!apiKey) {
       throw new Error("Missing GROQ_API_KEY. Add it to your server env (see .env.example).");

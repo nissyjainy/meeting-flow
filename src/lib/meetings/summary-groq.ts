@@ -1,3 +1,4 @@
+import { readServerEnv } from "@/lib/server-env";
 import { summaryError, summaryLog, summaryPreview } from "./summary-debug";
 
 /** Max transcript chars sent to Groq (avoids context / payload limits). */
@@ -20,8 +21,8 @@ type GroqChatCompletionResponse = {
 };
 
 function getGroqChatConfig() {
-  const apiKey = process.env.GROQ_API_KEY;
-  const preferred = process.env.GROQ_CHAT_MODEL?.trim();
+  const apiKey = readServerEnv("GROQ_API_KEY");
+  const preferred = readServerEnv("GROQ_CHAT_MODEL")?.trim();
   const models = preferred
     ? [preferred, ...GROQ_CHAT_FALLBACK_MODELS.filter((m) => m !== preferred)]
     : [...GROQ_CHAT_FALLBACK_MODELS];

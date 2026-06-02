@@ -51,6 +51,10 @@ export type EnvResolution = {
 
 const workerEnvCache: Record<string, string> = {};
 
+function isClientPublicEnvKey(key: string): boolean {
+  return key.startsWith("VITE_");
+}
+
 export function resolveServerEnv(key: string): EnvResolution {
   const fromWorker = sanitizeEnvValue(workerEnvCache[key]);
   if (fromWorker) {
@@ -60,12 +64,12 @@ export function resolveServerEnv(key: string): EnvResolution {
     }
   }
 
-  const fromMeta = readImportMetaEnv(key);
   const fromProcess = readProcessEnv(key);
+  const fromMeta = isClientPublicEnvKey(key) ? readImportMetaEnv(key) : undefined;
 
   const candidates: Array<{ value: string | undefined; source: EnvResolution["source"] }> = [
-    { value: fromMeta, source: "import.meta.env" },
     { value: fromProcess, source: "process.env" },
+    { value: fromMeta, source: "import.meta.env" },
   ];
 
   if (key === "RESEND_API_KEY") {
