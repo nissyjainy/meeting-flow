@@ -23,11 +23,12 @@ import {
   selectActiveTasksForDisplay,
 } from "@/lib/tasks/task-execution-view";
 import { cn } from "@/lib/utils";
+import { pageTitle } from "@/lib/branding";
 
 export const Route = createFileRoute("/_app/tasks")({
   head: () => ({
     meta: [
-      { title: "Tasks — Northstar" },
+      { title: pageTitle("Tasks") },
       { name: "description", content: "AI-extracted action items with execution tracking." },
     ],
   }),

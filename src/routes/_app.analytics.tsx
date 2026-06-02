@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AccountabilityAnalyticsView } from "@/components/analytics/AccountabilityAnalyticsView";
 import { useAccountabilityAnalytics } from "@/hooks/use-accountability-analytics";
+import { pageTitle } from "@/lib/branding";
 
 export const Route = createFileRoute("/_app/analytics")({
   head: () => ({
     meta: [
-      { title: "Analytics — Northstar" },
+      { title: pageTitle("Analytics") },
       {
         name: "description",
         content: "Accountability analytics from task lifecycle and completion data.",

@@ -7,6 +7,7 @@ import {
   useGoogleCalendarConnection,
   useSyncGoogleCalendar,
 } from "@/hooks/use-google-calendar-connection";
+import { PRODUCT_NAME } from "@/lib/branding";
 
 function formatTimestamp(value: string | null): string {
   if (!value) return "Never";
@@ -154,7 +155,7 @@ export function GoogleCalendarConnect() {
         <div className="mt-4 space-y-3">
           <p className="text-sm text-muted-foreground">
             Connect your Google Calendar to import upcoming meetings into the Scheduled tab on
-            Meetings. Northstar requests read-only calendar access only.
+            Meetings. {PRODUCT_NAME} requests read-only calendar access only.
           </p>
           <Button type="button" size="sm" asChild className="bg-gradient-primary text-primary-foreground hover:opacity-90">
             <a href="/api/integrations/google/connect">Connect Google Calendar</a>

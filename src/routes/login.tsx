@@ -12,6 +12,7 @@ import { Card } from "@/components/ui/card";
 import { loginFn, signupFn } from "@/lib/auth/server";
 import { buildOAuthRedirectUrl, normalizeAuthRedirectPath } from "@/lib/auth/redirect-path";
 import { createClient } from "@/lib/supabase/client";
+import { pageTitle, PRODUCT_NAME } from "@/lib/branding";
 
 type LoginSearch = {
   redirect?: string;
@@ -28,8 +29,8 @@ export const Route = createFileRoute("/login")({
   },
   head: () => ({
     meta: [
-      { title: "Sign in — Northstar" },
-      { name: "description", content: "Sign in to your Northstar Meeting Intelligence workspace." },
+      { title: pageTitle("Sign in") },
+      { name: "description", content: `Sign in to your ${PRODUCT_NAME} workspace.` },
     ],
   }),
   component: LoginPage,
@@ -102,7 +103,7 @@ export function AuthShell({
             <motion.div className="grid h-8 w-8 place-items-center rounded-lg bg-white/15 backdrop-blur">
               <Sparkles className="h-4 w-4" />
             </motion.div>
-            <span className="text-sm font-semibold">Northstar</span>
+            <span className="text-sm font-semibold">{PRODUCT_NAME}</span>
           </motion.div>
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
             <motion.div className="max-w-md text-3xl font-semibold leading-tight">
@@ -112,11 +113,11 @@ export function AuthShell({
               Auto-transcribe, summarize and extract action items — then watch them flow into your team's tasks in real time.
             </p>
             <motion.div className="mt-8 rounded-2xl border border-white/15 bg-white/10 p-5 backdrop-blur">
-              <p className="text-sm italic">"We replaced three tools with Northstar. Our weekly syncs feel 2x faster."</p>
+              <p className="text-sm italic">"We replaced three tools with {PRODUCT_NAME}. Our weekly syncs feel 2x faster."</p>
               <motion.div className="mt-3 text-xs opacity-80">— Maya L., Head of Operations at Linear</motion.div>
             </motion.div>
           </motion.div>
-          <motion.div className="text-xs opacity-60">© 2026 Northstar Labs</motion.div>
+          <motion.div className="text-xs opacity-60">© 2026 {PRODUCT_NAME}</motion.div>
         </motion.div>
       </motion.div>
 
@@ -127,7 +128,7 @@ export function AuthShell({
               <motion.div className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-primary">
                 <Sparkles className="h-3.5 w-3.5 text-primary-foreground" />
               </motion.div>
-              <span className="text-sm font-semibold">Northstar</span>
+              <span className="text-sm font-semibold">{PRODUCT_NAME}</span>
             </motion.div>
             <h1 className="text-xl font-semibold tracking-tight">
               {isLogin ? "Welcome back" : "Create your account"}

@@ -6,11 +6,12 @@ import { NotificationsList } from "@/components/notifications/NotificationsList"
 import { useNotifications } from "@/hooks/use-notifications";
 import { useState } from "react";
 import type { NotificationTab } from "@/lib/notifications/present-notifications";
+import { pageTitle } from "@/lib/branding";
 
 export const Route = createFileRoute("/_app/notifications")({
   head: () => ({
     meta: [
-      { title: "Notifications — Northstar" },
+      { title: pageTitle("Notifications") },
       { name: "description", content: "Mentions, reminders and AI updates in one focused inbox." },
     ],
   }),

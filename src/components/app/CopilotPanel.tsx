@@ -27,7 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useAppStore } from "@/store/app-store";
 import { useCopilot } from "@/hooks/use-copilot";
-import { useIsLargeScreen } from "@/hooks/use-lg-screen";
+import { useIsXLargeScreen } from "@/hooks/use-is-xl-screen";
 import {
   COPILOT_SUGGESTIONS,
   suggestionQuery,
@@ -35,6 +35,10 @@ import {
 import type { CopilotIntent } from "@/lib/copilot/types";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+/** Embedded desktop panel — 288px (legacy was w-80 / 320px). */
+const DESKTOP_COPILOT_PANEL_CLASS =
+  "flex w-72 shrink-0 flex-col border-l border-border bg-card";
 
 const MEETING_SUGGESTION_INTENTS: CopilotIntent[] = [
   "meeting_summary",
@@ -227,7 +231,7 @@ export function CopilotPanel() {
     copilotFocusRequestId,
     clearCopilotFocusMeeting,
   } = useAppStore();
-  const isLargeScreen = useIsLargeScreen();
+  const isXLargeScreen = useIsXLargeScreen();
   const meetingMatch = useMatch({ from: "/_app/meetings/$id", shouldThrow: false });
   const meetingId = copilotFocusMeetingId ?? meetingMatch?.params.id ?? null;
   const inputRef = useRef<HTMLInputElement>(null);
@@ -261,7 +265,7 @@ export function CopilotPanel() {
     }, 100);
 
     return () => window.clearTimeout(focusTimer);
-  }, [copilotOpen, isLargeScreen]);
+  }, [copilotOpen, isXLargeScreen]);
 
   function handleClose() {
     setShowReadyBanner(false);
@@ -284,15 +288,15 @@ export function CopilotPanel() {
 
   return (
     <>
-      {isLargeScreen && (
+      {isXLargeScreen && (
         <AnimatePresence>
           {copilotOpen && (
             <motion.aside
-              initial={{ x: 360, opacity: 0 }}
+              initial={{ x: 288, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
-              exit={{ x: 360, opacity: 0 }}
+              exit={{ x: 288, opacity: 0 }}
               transition={{ type: "spring", stiffness: 260, damping: 28 }}
-              className="flex w-80 shrink-0 flex-col border-l border-border bg-card"
+              className={DESKTOP_COPILOT_PANEL_CLASS}
             >
               <CopilotPanelContent {...contentProps} />
             </motion.aside>
@@ -300,7 +304,7 @@ export function CopilotPanel() {
         </AnimatePresence>
       )}
 
-      {!isLargeScreen && (
+      {!isXLargeScreen && (
         <Sheet
           open={copilotOpen}
           onOpenChange={(open) => {
@@ -310,7 +314,7 @@ export function CopilotPanel() {
         >
           <SheetContent
             side="right"
-            className="flex w-full flex-col gap-0 p-0 sm:max-w-md [&>button]:hidden"
+            className="flex w-full flex-col gap-0 p-0 sm:max-w-sm [&>button]:hidden"
           >
             <CopilotPanelContent {...contentProps} />
           </SheetContent>

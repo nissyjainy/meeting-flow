@@ -3,11 +3,12 @@ import { TeamInsightsView } from "@/components/team-insights/TeamInsightsView";
 import { useAllTasks } from "@/hooks/use-all-tasks";
 import { computeTeamInsights } from "@/lib/tasks/team-insights";
 import { useMemo } from "react";
+import { pageTitle } from "@/lib/branding";
 
 export const Route = createFileRoute("/_app/team-insights")({
   head: () => ({
     meta: [
-      { title: "Team Insights — Northstar" },
+      { title: pageTitle("Team Insights") },
       {
         name: "description",
         content: "Per-owner task accountability metrics from meeting action items.",

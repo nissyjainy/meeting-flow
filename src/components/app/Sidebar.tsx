@@ -17,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useMeetingUploadTrigger } from "@/providers/meeting-upload-provider";
+import { PRODUCT_NAME } from "@/lib/branding";
 
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -41,8 +42,8 @@ export function AppSidebar() {
           <Sparkles className="h-4 w-4 text-primary-foreground" />
         </div>
         <div className="leading-tight">
-          <div className="text-sm font-semibold text-sidebar-foreground">Northstar</div>
-          <div className="text-[11px] text-muted-foreground">Meeting Intelligence</div>
+          <div className="text-sm font-semibold text-sidebar-foreground">{PRODUCT_NAME}</div>
+          <div className="text-[11px] text-muted-foreground">AI meeting workflow</div>
         </div>
       </div>
 

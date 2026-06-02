@@ -20,6 +20,7 @@ import { createClient } from "@/lib/supabase/client";
 import { computeTeamInsights, type OwnerInsightRow } from "@/lib/tasks/team-insights";
 import { EmptyStateCard } from "@/components/ui/empty-state-card";
 import { cn } from "@/lib/utils";
+import { pageTitle } from "@/lib/branding";
 
 const UNASSIGNED_OWNER_KEY = "__unassigned__";
 
@@ -31,7 +32,7 @@ type WorkspaceTeamMember = {
 export const Route = createFileRoute("/_app/team")({
   head: () => ({
     meta: [
-      { title: "Team — Northstar" },
+      { title: pageTitle("Team") },
       { name: "description", content: "Task owners and workload from your meeting action items." },
     ],
   }),

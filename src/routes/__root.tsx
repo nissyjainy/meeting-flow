@@ -12,6 +12,8 @@ import { fetchUser } from "@/lib/auth/server";
 import type { RouterContext } from "@/router";
 import { AuthProvider } from "@/providers/auth-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { THEME_INIT_SCRIPT } from "@/lib/theme";
+import { PRODUCT_NAME, PRODUCT_TAGLINE } from "@/lib/branding";
 import appCss from "../styles.css?url";
 
 function NotFoundComponent() {
@@ -80,11 +82,12 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Northstar" },
-      { name: "description", content: "AI meeting intelligence for modern teams." },
-      { name: "author", content: "Northstar" },
-      { property: "og:title", content: "Northstar" },
-      { property: "og:description", content: "AI meeting intelligence for modern teams." },
+      { title: PRODUCT_NAME },
+      { name: "description", content: PRODUCT_TAGLINE },
+      { name: "author", content: PRODUCT_NAME },
+      { property: "og:title", content: PRODUCT_NAME },
+      { property: "og:description", content: PRODUCT_TAGLINE },
+      { property: "og:site_name", content: PRODUCT_NAME },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -103,8 +106,9 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <HeadContent />
       </head>
       <body>

@@ -7,6 +7,7 @@ import {
   getReminderSectionMeta,
   type ReminderSectionMeta,
 } from "./reminder-labels";
+import { PRODUCT_NAME } from "@/lib/branding";
 
 export const REMINDER_EMAIL_TEMPLATE_VERSION = "v2-labeled-cards";
 
@@ -116,7 +117,7 @@ export function buildTaskReminderEmail(params: {
 <html>
   <body style="margin:0;padding:24px;background:#f8fafc;font-family:Inter,Segoe UI,sans-serif;color:#0f172a;">
     <div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;padding:28px;">
-      <p style="margin:0 0 8px;font-size:13px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:#64748b;">Northstar Meeting Flow</p>
+      <p style="margin:0 0 8px;font-size:13px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:#64748b;">${PRODUCT_NAME}</p>
       <h1 style="margin:0 0 16px;font-size:24px;font-weight:700;">Task reminders</h1>
       <p style="margin:0 0 8px;font-size:15px;color:#0f172a;">${greeting}</p>
       <p style="margin:0 0 16px;font-size:15px;line-height:1.5;color:#334155;">${intro}</p>

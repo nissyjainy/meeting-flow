@@ -4,11 +4,12 @@ import { useMeeting, useMeetingPlaybackUrl } from "@/hooks/use-meeting";
 import { MeetingDetailLoadingView, MeetingDetailView } from "@/components/meetings/MeetingDetailView";
 import { MeetingLoadErrorView } from "@/components/meetings/MeetingLoadErrorView";
 import { getPipelineDisplayStatus } from "@/lib/meetings/meeting-display";
+import { pageTitle } from "@/lib/branding";
 
 export const Route = createFileRoute("/_app/meetings/$id")({
   head: () => ({
     meta: [
-      { title: "Meeting — Northstar" },
+      { title: pageTitle("Meeting") },
       { name: "description", content: "Meeting recording and details." },
     ],
   }),

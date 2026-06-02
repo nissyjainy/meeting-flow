@@ -1,7 +1,11 @@
 import { create } from "zustand";
 import { persistNotificationReadIds, readNotificationReadIds } from "@/lib/notifications/read-state";
-
-type Theme = "light" | "dark";
+import {
+  applyThemeToDocument,
+  persistTheme,
+  readStoredTheme,
+  type Theme,
+} from "@/lib/theme";
 
 interface AppState {
   theme: Theme;
@@ -25,23 +29,22 @@ function persistReadIds(readIds: Set<string>) {
   persistNotificationReadIds(readIds);
 }
 
+function setThemeOnStore(theme: Theme) {
+  applyThemeToDocument(theme);
+  persistTheme(theme);
+  return { theme };
+}
+
 export const useAppStore = create<AppState>((set) => ({
-  theme: "light",
+  theme: readStoredTheme(),
   toggleTheme: () =>
     set((s) => {
       const next: Theme = s.theme === "light" ? "dark" : "light";
-      if (typeof document !== "undefined") {
-        document.documentElement.classList.toggle("dark", next === "dark");
-      }
+      applyThemeToDocument(next);
+      persistTheme(next);
       return { theme: next };
     }),
-  setTheme: (t) =>
-    set(() => {
-      if (typeof document !== "undefined") {
-        document.documentElement.classList.toggle("dark", t === "dark");
-      }
-      return { theme: t };
-    }),
+  setTheme: (t) => set(() => setThemeOnStore(t)),
 
   copilotOpen: true,
   toggleCopilot: () => set((s) => ({ copilotOpen: !s.copilotOpen })),

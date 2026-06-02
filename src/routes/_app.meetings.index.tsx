@@ -33,6 +33,7 @@ import {
   formatMeetingDate,
 } from "@/lib/meetings/validation";
 import { useMeetingUploadTrigger } from "@/providers/meeting-upload-provider";
+import { pageTitle } from "@/lib/branding";
 
 export const Route = createFileRoute("/_app/meetings/")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -40,7 +41,7 @@ export const Route = createFileRoute("/_app/meetings/")({
   }),
   head: () => ({
     meta: [
-      { title: "Meetings — Northstar" },
+      { title: pageTitle("Meetings") },
       {
         name: "description",
         content: "Every meeting, transcribed and searchable, with AI summaries and action items.",

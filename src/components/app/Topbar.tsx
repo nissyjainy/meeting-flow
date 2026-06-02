@@ -13,6 +13,7 @@ import {
 import { useAppStore } from "@/store/app-store";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useMeetingUploadTrigger } from "@/providers/meeting-upload-provider";
+import { PRODUCT_NAME } from "@/lib/branding";
 
 function initials(name: string | null, email: string) {
   if (name) {
@@ -35,7 +36,7 @@ export function Topbar() {
   return (
     <header className="sticky top-0 z-30 flex h-16 min-w-0 w-full items-center gap-2 border-b border-border bg-background/80 px-4 backdrop-blur-md sm:gap-3 md:px-6">
       <div className="min-w-0 flex-1 truncate text-sm font-semibold tracking-tight sm:text-base">
-        Northstar
+        {PRODUCT_NAME}
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-1.5">

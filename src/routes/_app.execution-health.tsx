@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ExecutionHealthView } from "@/components/execution-health/ExecutionHealthView";
 import { useExecutionHealth } from "@/hooks/use-execution-health";
+import { pageTitle } from "@/lib/branding";
 
 export const Route = createFileRoute("/_app/execution-health")({
   head: () => ({
     meta: [
-      { title: "Execution Health — Northstar" },
+      { title: pageTitle("Execution Health") },
       {
         name: "description",
         content: "Manager-focused execution health: score, trends, risks, and owner insights.",

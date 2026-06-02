@@ -34,7 +34,7 @@ This creates:
 
 In **Storage**, confirm a bucket named `meetings` exists (private).
 
-## 3. Test in the app
+## 3. Test in MeetFlow
 
 1. Sign in at `/login`
 2. Go to **Meetings** → **Upload recording**

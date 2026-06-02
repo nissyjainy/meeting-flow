@@ -29,11 +29,12 @@ import { useDashboardAnalytics } from "@/hooks/use-dashboard-analytics";
 import { useMeetingUploadTrigger } from "@/providers/meeting-upload-provider";
 import { useAppStore } from "@/store/app-store";
 import { cn } from "@/lib/utils";
+import { pageTitle } from "@/lib/branding";
 
 export const Route = createFileRoute("/_app/")({
   head: () => ({
     meta: [
-      { title: "Dashboard — Northstar Meeting Intelligence" },
+      { title: pageTitle("Dashboard") },
       {
         name: "description",
         content:

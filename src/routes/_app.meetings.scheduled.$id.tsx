@@ -13,11 +13,12 @@ import { useCalendarEvent } from "@/hooks/use-calendar-event";
 import { formatScheduledRange } from "@/lib/calendar/meetings-list";
 import { meetingPlatformLabel } from "@/lib/meetings/detect-meeting-platform";
 import { useMeetingUploadTrigger } from "@/providers/meeting-upload-provider";
+import { pageTitle } from "@/lib/branding";
 
 export const Route = createFileRoute("/_app/meetings/scheduled/$id")({
   head: () => ({
     meta: [
-      { title: "Scheduled meeting — Northstar" },
+      { title: pageTitle("Scheduled meeting") },
       { name: "description", content: "Imported Google Calendar event details." },
     ],
   }),

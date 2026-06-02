@@ -9,8 +9,31 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { GoogleCalendarConnect } from "@/components/integrations/GoogleCalendarConnect";
 import { useAppStore } from "@/store/app-store";
 import { EmptyStateCard } from "@/components/ui/empty-state-card";
+import { Badge } from "@/components/ui/badge";
+import { featureFlags, SETTINGS_ROADMAP_TABS } from "@/lib/feature-flags";
+import { DEFAULT_WORKSPACE_NAME, pageTitle, PRODUCT_NAME } from "@/lib/branding";
 
-const WORKSPACE_NAME = "Northstar";
+const WORKSPACE_NAME = DEFAULT_WORKSPACE_NAME;
+
+const SETTINGS_TABS = ["account", "workspace", "ai", "integrations", "billing"] as const;
+type SettingsTab = (typeof SETTINGS_TABS)[number];
+
+function isSettingsTab(value: string | undefined): value is SettingsTab {
+  return SETTINGS_TABS.includes(value as SettingsTab);
+}
+
+function isVisibleSettingsTab(tab: SettingsTab): boolean {
+  if (tab === "ai") return featureFlags.settingsAiCopilotTab;
+  if (tab === "billing") return featureFlags.settingsBillingTab;
+  return true;
+}
+
+function resolveSettingsTab(tab: string | undefined): SettingsTab {
+  if (tab && isSettingsTab(tab) && isVisibleSettingsTab(tab)) {
+    return tab;
+  }
+  return "account";
+}
 
 function userInitials(fullName: string | null | undefined, email: string): string {
   if (fullName?.trim()) {
@@ -33,7 +56,7 @@ export const Route = createFileRoute("/_app/settings")({
   }),
   head: () => ({
     meta: [
-      { title: "Settings — Northstar" },
+      { title: pageTitle("Settings") },
       { name: "description", content: "Account and workspace settings." },
     ],
   }),
@@ -47,10 +70,7 @@ function SettingsPage() {
 
   const displayName = user?.fullName?.trim() || "Account";
   const email = user?.email ?? "";
-  const defaultTab =
-    tab === "integrations" || tab === "workspace" || tab === "ai" || tab === "billing"
-      ? tab
-      : "account";
+  const defaultTab = resolveSettingsTab(tab);
 
   useEffect(() => {
     if (connected) {
@@ -75,9 +95,13 @@ function SettingsPage() {
         <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
           <TabsTrigger value="account">Account</TabsTrigger>
           <TabsTrigger value="workspace">Workspace</TabsTrigger>
-          <TabsTrigger value="ai">AI Copilot</TabsTrigger>
+          {featureFlags.settingsAiCopilotTab ? (
+            <SettingsTabTrigger value="ai" label="AI Copilot" />
+          ) : null}
           <TabsTrigger value="integrations">Integrations</TabsTrigger>
-          <TabsTrigger value="billing">Billing</TabsTrigger>
+          {featureFlags.settingsBillingTab ? (
+            <SettingsTabTrigger value="billing" label="Billing" />
+          ) : null}
         </TabsList>
 
         <TabsContent value="account" className="mt-5 space-y-4">
@@ -107,7 +131,7 @@ function SettingsPage() {
 
           <Card className="p-6 shadow-card">
             <div className="text-sm font-semibold">Appearance</div>
-            <p className="text-xs text-muted-foreground">Pick how Northstar looks on this device.</p>
+            <p className="text-xs text-muted-foreground">Pick how {PRODUCT_NAME} looks on this device.</p>
             <div className="mt-4 grid grid-cols-2 gap-2">
               {(["light", "dark"] as const).map((value) => (
                 <button
@@ -140,32 +164,77 @@ function SettingsPage() {
               </div>
             </div>
           </Card>
-          <ComingSoonCard description="Workspace sharing, URLs, and team defaults are not available yet." />
+          <ComingSoonCard
+            title="Planned workspace features"
+            description={`${PRODUCT_NAME} uses a single workspace today — your name and sign-in are shown above. Link task owner emails per meeting from the Team page or each meeting's Team Members section. Shared workspaces, invite links, and organization-wide defaults are on the roadmap.`}
+          />
         </TabsContent>
 
-        <TabsContent value="ai" className="mt-5">
-          <ComingSoonCard description="Copilot preferences and summary defaults are not available yet." />
-        </TabsContent>
+        {featureFlags.settingsAiCopilotTab ? (
+          <TabsContent value="ai" className="mt-5 space-y-3">
+            <ComingSoonCard
+              title="Copilot settings"
+              description="Meeting Copilot is available today from the panel on the right — ask about summaries, action items, owners, and deadlines on any meeting page. Preferences such as summary tone, default prompts, and workspace-wide Copilot policies will be configurable here in a future release."
+            />
+          </TabsContent>
+        ) : null}
 
         <TabsContent value="integrations" className="mt-5 space-y-4">
           <GoogleCalendarConnect />
-          <ComingSoonCard description="Zoom, Slack, and GitHub integrations are not available yet." />
+          <ComingSoonCard
+            title="More integrations"
+            description="Google Calendar is available above — connect to import upcoming meetings into the Scheduled tab on Meetings. Zoom, Microsoft Teams, Slack, and GitHub integrations are on the roadmap."
+          />
         </TabsContent>
 
-        <TabsContent value="billing" className="mt-5">
-          <ComingSoonCard description="Subscription and usage billing are not available yet." />
-        </TabsContent>
+        {featureFlags.settingsBillingTab ? (
+          <TabsContent value="billing" className="mt-5 space-y-3">
+            <ComingSoonCard
+              title="Billing & plans"
+              description={`Subscription tiers, usage-based billing, and invoicing are on the ${PRODUCT_NAME} roadmap. The current MVP does not require a paid plan or payment setup.`}
+            />
+            <RoadmapNote />
+          </TabsContent>
+        ) : null}
       </Tabs>
     </div>
   );
 }
 
-function ComingSoonCard({ description }: { description: string }) {
+function SettingsTabTrigger({ value, label }: { value: SettingsTab; label: string }) {
+  const isRoadmap = SETTINGS_ROADMAP_TABS.has(value);
+
   return (
-    <EmptyStateCard
-      title="Coming soon"
-      description={description}
-      className="shadow-card"
-    />
+    <TabsTrigger value={value} className="gap-1.5">
+      {label}
+      {isRoadmap ? (
+        <Badge
+          variant="secondary"
+          className="pointer-events-none border-border/60 px-1.5 py-0 text-[10px] font-medium leading-4"
+        >
+          Coming Soon
+        </Badge>
+      ) : null}
+    </TabsTrigger>
+  );
+}
+
+function RoadmapNote() {
+  return (
+    <p className="text-center text-xs text-muted-foreground">
+      On the {PRODUCT_NAME} roadmap — not included in the current MVP.
+    </p>
+  );
+}
+
+function ComingSoonCard({
+  title = "Coming soon",
+  description,
+}: {
+  title?: string;
+  description: string;
+}) {
+  return (
+    <EmptyStateCard title={title} description={description} className="shadow-card" />
   );
 }

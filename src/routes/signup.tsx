@@ -1,5 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { AuthShell } from "./login";
+import { pageTitle, PRODUCT_NAME, PRODUCT_TAGLINE } from "@/lib/branding";
 
 type SignupSearch = {
   redirect?: string;
@@ -16,8 +17,8 @@ export const Route = createFileRoute("/signup")({
   },
   head: () => ({
     meta: [
-      { title: "Create account — Northstar" },
-      { name: "description", content: "Start your free Northstar trial — AI meeting intelligence for modern teams." },
+      { title: pageTitle("Create account") },
+      { name: "description", content: `Start your free ${PRODUCT_NAME} trial — ${PRODUCT_TAGLINE}.` },
     ],
   }),
   component: SignupPage,
