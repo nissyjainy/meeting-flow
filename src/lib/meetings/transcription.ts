@@ -17,6 +17,11 @@ type GroqWhisperResponse = {
 function getGroqConfig() {
   uploadDebug("transcription getGroqConfig started (server)");
   try {
+    console.log(
+      "[groq-debug]",
+      "GROQ_API_KEY",
+      readServerEnv("GROQ_API_KEY") ? "FOUND" : "MISSING",
+    );
     const apiKey = readServerEnv("GROQ_API_KEY");
     const model = readServerEnv("GROQ_WHISPER_MODEL") || "whisper-large-v3";
 
