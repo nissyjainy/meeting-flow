@@ -51,6 +51,32 @@ export type EnvResolution = {
 
 const workerEnvCache: Record<string, string> = {};
 
+/** Cloudflare bindings must be read by key; Object.entries(env) misses many secrets. */
+const WORKER_ENV_ALLOWLIST = [
+  "GROQ_API_KEY",
+  "GROQ_WHISPER_MODEL",
+  "GOOGLE_CLIENT_ID",
+  "GOOGLE_CLIENT_SECRET",
+  "RESEND_API_KEY",
+  "CRON_SECRET",
+  "SUPABASE_SERVICE_ROLE_KEY",
+  "VITE_SUPABASE_URL",
+  "VITE_SUPABASE_PUBLISHABLE_KEY",
+  "APP_URL",
+] as const;
+
+const WORKER_ENV_ALLOWLIST_SET = new Set<string>(WORKER_ENV_ALLOWLIST);
+
+function storeWorkerEnvValue(key: string, raw: unknown): void {
+  const value = sanitizeEnvValue(typeof raw === "string" ? raw : undefined);
+  if (!value) return;
+
+  workerEnvCache[key] = value;
+  if (typeof process !== "undefined" && process.env) {
+    process.env[key] = value;
+  }
+}
+
 function isClientPublicEnvKey(key: string): boolean {
   return key.startsWith("VITE_");
 }
@@ -108,13 +134,17 @@ export function maskSecret(value: string | undefined): string {
 export function bindWorkerEnv(env: unknown): void {
   if (!env || typeof env !== "object") return;
 
-  for (const [key, value] of Object.entries(env as Record<string, unknown>)) {
-    if (typeof value === "string" && value.length > 0) {
-      workerEnvCache[key] = value;
-      if (typeof process !== "undefined" && process.env) {
-        process.env[key] = value;
-      }
-    }
+  const bindings = env as Record<string, unknown>;
+
+  for (const key of WORKER_ENV_ALLOWLIST) {
+    const value = bindings[key];
+    console.log("[env-debug]", key, typeof value === "string" ? "FOUND" : "MISSING");
+    storeWorkerEnvValue(key, value);
+  }
+
+  for (const [key, value] of Object.entries(bindings)) {
+    if (WORKER_ENV_ALLOWLIST_SET.has(key)) continue;
+    storeWorkerEnvValue(key, value);
   }
 }
 
