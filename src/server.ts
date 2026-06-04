@@ -102,6 +102,7 @@ let envLogged = false;
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      console.log("[worker-env-keys]", Object.keys(env || {}));
       bindWorkerEnv(env);
       if (!envLogged) {
         envLogged = true;
@@ -125,6 +126,7 @@ export default {
     env: unknown,
     ctx: { waitUntil: (promise: Promise<unknown>) => void },
   ) {
+    console.log("[worker-env-keys]", Object.keys(env || {}));
     bindWorkerEnv(env);
     const { reminderLog } = await import("./lib/reminders/reminder-debug");
     reminderLog("scheduler triggered — Cloudflare cron");
