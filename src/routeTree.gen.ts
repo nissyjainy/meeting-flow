@@ -14,6 +14,7 @@ import { Route as LogoutRouteImport } from './routes/logout'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AppIndexRouteImport } from './routes/_app.index'
+import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as AppTeamInsightsRouteImport } from './routes/_app.team-insights'
 import { Route as AppTeamRouteImport } from './routes/_app.team'
 import { Route as AppTasksRouteImport } from './routes/_app.tasks'
@@ -53,6 +54,11 @@ const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AppRoute,
+} as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/auth/callback',
+  path: '/auth/callback',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AppTeamInsightsRoute = AppTeamInsightsRouteImport.update({
   id: '/team-insights',
@@ -146,6 +152,7 @@ export interface FileRoutesByFullPath {
   '/tasks': typeof AppTasksRoute
   '/team': typeof AppTeamRoute
   '/team-insights': typeof AppTeamInsightsRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/meetings/$id': typeof AppMeetingsIdRoute
   '/api/cron/task-reminders': typeof ApiCronTaskRemindersRoute
   '/meetings/': typeof AppMeetingsIndexRoute
@@ -165,6 +172,7 @@ export interface FileRoutesByTo {
   '/tasks': typeof AppTasksRoute
   '/team': typeof AppTeamRoute
   '/team-insights': typeof AppTeamInsightsRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/': typeof AppIndexRoute
   '/meetings/$id': typeof AppMeetingsIdRoute
   '/api/cron/task-reminders': typeof ApiCronTaskRemindersRoute
@@ -188,6 +196,7 @@ export interface FileRoutesById {
   '/_app/tasks': typeof AppTasksRoute
   '/_app/team': typeof AppTeamRoute
   '/_app/team-insights': typeof AppTeamInsightsRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/_app/': typeof AppIndexRoute
   '/_app/meetings/$id': typeof AppMeetingsIdRoute
   '/api/cron/task-reminders': typeof ApiCronTaskRemindersRoute
@@ -212,6 +221,7 @@ export interface FileRouteTypes {
     | '/tasks'
     | '/team'
     | '/team-insights'
+    | '/auth/callback'
     | '/meetings/$id'
     | '/api/cron/task-reminders'
     | '/meetings/'
@@ -231,6 +241,7 @@ export interface FileRouteTypes {
     | '/tasks'
     | '/team'
     | '/team-insights'
+    | '/auth/callback'
     | '/'
     | '/meetings/$id'
     | '/api/cron/task-reminders'
@@ -253,6 +264,7 @@ export interface FileRouteTypes {
     | '/_app/tasks'
     | '/_app/team'
     | '/_app/team-insights'
+    | '/auth/callback'
     | '/_app/'
     | '/_app/meetings/$id'
     | '/api/cron/task-reminders'
@@ -268,6 +280,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   LogoutRoute: typeof LogoutRoute
   SignupRoute: typeof SignupRoute
+  AuthCallbackRoute: typeof AuthCallbackRoute
   ApiCronTaskRemindersRoute: typeof ApiCronTaskRemindersRoute
   ApiIntegrationsGoogleCallbackRoute: typeof ApiIntegrationsGoogleCallbackRoute
   ApiIntegrationsGoogleConnectRoute: typeof ApiIntegrationsGoogleConnectRoute
@@ -310,6 +323,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/auth/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_app/team-insights': {
       id: '/_app/team-insights'
@@ -466,6 +486,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   LogoutRoute: LogoutRoute,
   SignupRoute: SignupRoute,
+  AuthCallbackRoute: AuthCallbackRoute,
   ApiCronTaskRemindersRoute: ApiCronTaskRemindersRoute,
   ApiIntegrationsGoogleCallbackRoute: ApiIntegrationsGoogleCallbackRoute,
   ApiIntegrationsGoogleConnectRoute: ApiIntegrationsGoogleConnectRoute,

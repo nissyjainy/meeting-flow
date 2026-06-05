@@ -28,8 +28,13 @@ export function normalizeAuthRedirectPath(redirect?: string | null): string {
   return trimmed;
 }
 
-/** Build an absolute URL for Supabase OAuth using a path-only redirect target. */
-export function buildOAuthRedirectUrl(origin: string, redirectPath?: string | null): string {
-  const path = normalizeAuthRedirectPath(redirectPath);
-  return `${origin.replace(/\/$/, "")}${path}`;
+/** Build the Supabase OAuth redirect URL — must hit /auth/callback to exchange the PKCE code. */
+export function buildOAuthRedirectUrl(origin: string, finalRedirectPath?: string | null): string {
+  const base = origin.replace(/\/$/, "");
+  const callback = new URL("/auth/callback", base);
+  const next = normalizeAuthRedirectPath(finalRedirectPath);
+  if (next !== DEFAULT_PATH) {
+    callback.searchParams.set("redirect", next);
+  }
+  return callback.toString();
 }

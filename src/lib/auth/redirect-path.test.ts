@@ -26,9 +26,18 @@ describe("normalizeAuthRedirectPath", () => {
 });
 
 describe("buildOAuthRedirectUrl", () => {
-  it("does not double-concatenate origin", () => {
+  it("targets /auth/callback for PKCE exchange", () => {
+    expect(buildOAuthRedirectUrl("http://localhost:8080")).toBe(
+      "http://localhost:8080/auth/callback",
+    );
+  });
+
+  it("passes final destination via redirect query param", () => {
+    expect(buildOAuthRedirectUrl("http://localhost:8080", "/meetings")).toBe(
+      "http://localhost:8080/auth/callback?redirect=%2Fmeetings",
+    );
     expect(buildOAuthRedirectUrl("http://localhost:8080", "http://localhost:8080/meetings")).toBe(
-      "http://localhost:8080/meetings",
+      "http://localhost:8080/auth/callback?redirect=%2Fmeetings",
     );
   });
 });
