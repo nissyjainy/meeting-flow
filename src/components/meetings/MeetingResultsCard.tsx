@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { FileText, ListChecks, Loader2, Sparkles } from "lucide-react";
+import { FileText, ListChecks, Loader2, Sparkles, XCircle } from "lucide-react";
 import { MeetingTasksDisplay } from "./MeetingTasksDisplay";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -57,6 +57,15 @@ function ProcessingPlaceholder({ message }: { message: string }) {
   );
 }
 
+function FailedPlaceholder({ message }: { message: string }) {
+  return (
+    <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-3 text-sm text-destructive">
+      <XCircle className="mt-0.5 h-4 w-4 shrink-0" />
+      <span>{message}</span>
+    </div>
+  );
+}
+
 function EmptyFallback({ message }: { message: string }) {
   return (
     <p className="rounded-lg bg-muted/40 px-3 py-3 text-sm text-muted-foreground">{message}</p>
@@ -79,7 +88,6 @@ export function MeetingResultsCard({ meeting, isLoading }: MeetingResultsCardPro
   const pipeline = getPipelineDisplayStatus(meeting);
   const summaryReady = hasSummary(meeting);
   const transcriptReady = hasTranscript(meeting);
-
   return (
     <Card className="w-full p-5 shadow-card">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -104,7 +112,9 @@ export function MeetingResultsCard({ meeting, isLoading }: MeetingResultsCardPro
                 : undefined
           }
         >
-          {pipeline === "processing" && !summaryReady ? (
+          {pipeline === "failed" && !summaryReady ? (
+            <FailedPlaceholder message={summaryFallback(meeting)} />
+          ) : pipeline === "processing" && !summaryReady ? (
             <ProcessingPlaceholder message={summaryFallback(meeting)} />
           ) : summaryReady ? (
             <MeetingSummaryDisplay summary={meeting.summary!} />
@@ -132,7 +142,9 @@ export function MeetingResultsCard({ meeting, isLoading }: MeetingResultsCardPro
                 : undefined
           }
         >
-          {pipeline === "processing" && !transcriptReady ? (
+          {pipeline === "failed" && !transcriptReady ? (
+            <FailedPlaceholder message={transcriptFallback(meeting)} />
+          ) : pipeline === "processing" && !transcriptReady ? (
             <ProcessingPlaceholder message={transcriptFallback(meeting)} />
           ) : transcriptReady ? (
             <div className="max-h-[min(28rem,50vh)] overflow-y-auto rounded-lg border border-border bg-muted/20 px-3 py-3">

@@ -52,3 +52,17 @@ describe("getPipelineDisplayStatus", () => {
     expect(getPipelineDisplayStatus(meeting({ status: "failed" }))).toBe("failed");
   });
 });
+
+describe("transcriptFallback", () => {
+  it("shows stored error message when transcription failed", async () => {
+    const { transcriptFallback } = await import("./meeting-display");
+    expect(
+      transcriptFallback(
+        meeting({
+          status: "failed",
+          transcript_error: "Missing GROQ_API_KEY. Add it to your server env (see .env.example).",
+        }),
+      ),
+    ).toBe("Missing GROQ_API_KEY. Add it to your server env (see .env.example).");
+  });
+});

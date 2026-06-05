@@ -13,6 +13,7 @@ import {
   BarChart3,
   LineChart,
   Activity,
+  MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -21,6 +22,7 @@ import { PRODUCT_NAME } from "@/lib/branding";
 
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/assistant", label: "Assistant", icon: MessageSquare },
   { to: "/meetings", label: "Meetings", icon: Video },
   { to: "/tasks", label: "Tasks", icon: ListChecks },
   { to: "/team-insights", label: "Team Insights", icon: BarChart3 },

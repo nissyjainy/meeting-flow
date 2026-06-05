@@ -62,7 +62,7 @@ export const createMeetingRecordFn = createServerFn({ method: "POST" })
           transcript: data.transcript ?? null,
           status: "processing",
         })
-        .select("id,file_name,file_url,transcript,summary,status,created_at")
+        .select("id,file_name,file_url,transcript,summary,status,transcript_error,created_at")
         .single();
 
       if (error) {

@@ -6,6 +6,7 @@ export type MeetingRecordRow = {
   transcript: string | null;
   summary: string | null;
   status: string | null;
+  transcript_error?: string | null;
   created_at: string;
 };
 

@@ -106,6 +106,11 @@ export async function extractTasksFromTranscript(transcript: string): Promise<Ex
   }
 
   const { apiKey, models } = getGroqChatConfig();
+  taskLog("task extraction started", {
+    transcriptLength: payload.length,
+    models,
+    hasApiKey: Boolean(apiKey),
+  });
   let lastError: Error | null = null;
 
   for (const model of models) {

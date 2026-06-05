@@ -18,9 +18,17 @@ export function hasSummary(meeting: MeetingRecord): boolean {
   return Boolean(meeting.summary?.trim());
 }
 
+export function pipelineFailureMessage(meeting: MeetingRecord): string | null {
+  if (getPipelineDisplayStatus(meeting) !== "failed") return null;
+  return meeting.transcript_error?.trim() || null;
+}
+
 export function summaryFallback(meeting: MeetingRecord): string {
   const pipeline = getPipelineDisplayStatus(meeting);
   if (pipeline === "failed") {
+    if (!hasTranscript(meeting)) {
+      return pipelineFailureMessage(meeting) ?? "Processing failed before a summary could be generated.";
+    }
     return "Summary could not be generated. The transcript may still be available below.";
   }
   if (pipeline === "processing") {
@@ -34,7 +42,7 @@ export function summaryFallback(meeting: MeetingRecord): string {
 export function transcriptFallback(meeting: MeetingRecord): string {
   const pipeline = getPipelineDisplayStatus(meeting);
   if (pipeline === "failed") {
-    return "Transcription failed or is unavailable.";
+    return pipelineFailureMessage(meeting) ?? "Transcription failed or is unavailable.";
   }
   if (pipeline === "processing") {
     return "Transcript is being generated. Check back in a moment.";

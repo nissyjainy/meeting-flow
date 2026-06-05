@@ -22,6 +22,7 @@ import { Route as AppSettingsRouteImport } from './routes/_app.settings'
 import { Route as AppNotificationsRouteImport } from './routes/_app.notifications'
 import { Route as AppMeetingsRouteImport } from './routes/_app.meetings'
 import { Route as AppExecutionHealthRouteImport } from './routes/_app.execution-health'
+import { Route as AppAssistantRouteImport } from './routes/_app.assistant'
 import { Route as AppAnalyticsRouteImport } from './routes/_app.analytics'
 import { Route as AppMeetingsIndexRouteImport } from './routes/_app.meetings.index'
 import { Route as ApiCronTaskRemindersRouteImport } from './routes/api.cron.task-reminders'
@@ -95,6 +96,11 @@ const AppExecutionHealthRoute = AppExecutionHealthRouteImport.update({
   path: '/execution-health',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAssistantRoute = AppAssistantRouteImport.update({
+  id: '/assistant',
+  path: '/assistant',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAnalyticsRoute = AppAnalyticsRouteImport.update({
   id: '/analytics',
   path: '/analytics',
@@ -145,6 +151,7 @@ export interface FileRoutesByFullPath {
   '/logout': typeof LogoutRoute
   '/signup': typeof SignupRoute
   '/analytics': typeof AppAnalyticsRoute
+  '/assistant': typeof AppAssistantRoute
   '/execution-health': typeof AppExecutionHealthRoute
   '/meetings': typeof AppMeetingsRouteWithChildren
   '/notifications': typeof AppNotificationsRoute
@@ -166,6 +173,7 @@ export interface FileRoutesByTo {
   '/logout': typeof LogoutRoute
   '/signup': typeof SignupRoute
   '/analytics': typeof AppAnalyticsRoute
+  '/assistant': typeof AppAssistantRoute
   '/execution-health': typeof AppExecutionHealthRoute
   '/notifications': typeof AppNotificationsRoute
   '/settings': typeof AppSettingsRoute
@@ -189,6 +197,7 @@ export interface FileRoutesById {
   '/logout': typeof LogoutRoute
   '/signup': typeof SignupRoute
   '/_app/analytics': typeof AppAnalyticsRoute
+  '/_app/assistant': typeof AppAssistantRoute
   '/_app/execution-health': typeof AppExecutionHealthRoute
   '/_app/meetings': typeof AppMeetingsRouteWithChildren
   '/_app/notifications': typeof AppNotificationsRoute
@@ -214,6 +223,7 @@ export interface FileRouteTypes {
     | '/logout'
     | '/signup'
     | '/analytics'
+    | '/assistant'
     | '/execution-health'
     | '/meetings'
     | '/notifications'
@@ -235,6 +245,7 @@ export interface FileRouteTypes {
     | '/logout'
     | '/signup'
     | '/analytics'
+    | '/assistant'
     | '/execution-health'
     | '/notifications'
     | '/settings'
@@ -257,6 +268,7 @@ export interface FileRouteTypes {
     | '/logout'
     | '/signup'
     | '/_app/analytics'
+    | '/_app/assistant'
     | '/_app/execution-health'
     | '/_app/meetings'
     | '/_app/notifications'
@@ -380,6 +392,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppExecutionHealthRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/assistant': {
+      id: '/_app/assistant'
+      path: '/assistant'
+      fullPath: '/assistant'
+      preLoaderRoute: typeof AppAssistantRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/analytics': {
       id: '/_app/analytics'
       path: '/analytics'
@@ -457,6 +476,7 @@ const AppMeetingsRouteWithChildren = AppMeetingsRoute._addFileChildren(
 
 interface AppRouteChildren {
   AppAnalyticsRoute: typeof AppAnalyticsRoute
+  AppAssistantRoute: typeof AppAssistantRoute
   AppExecutionHealthRoute: typeof AppExecutionHealthRoute
   AppMeetingsRoute: typeof AppMeetingsRouteWithChildren
   AppNotificationsRoute: typeof AppNotificationsRoute
@@ -469,6 +489,7 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppAnalyticsRoute: AppAnalyticsRoute,
+  AppAssistantRoute: AppAssistantRoute,
   AppExecutionHealthRoute: AppExecutionHealthRoute,
   AppMeetingsRoute: AppMeetingsRouteWithChildren,
   AppNotificationsRoute: AppNotificationsRoute,

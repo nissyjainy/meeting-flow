@@ -73,6 +73,11 @@ export async function generateMeetingSummaryFromTranscript(transcript: string): 
   }
 
   const { apiKey, models } = getGroqChatConfig();
+  summaryLog("summary generation started", {
+    transcriptLength: payload.length,
+    models,
+    hasApiKey: Boolean(apiKey),
+  });
   let lastError: Error | null = null;
 
   for (const model of models) {
