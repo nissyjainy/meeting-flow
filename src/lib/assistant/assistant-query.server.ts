@@ -1,8 +1,15 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import {
+  buildAssistantAnalyticsContext,
+  loadAssistantWorkspaceAnalytics,
+} from "./assistant-analytics-context.server";
 import { loadAssistantCorpus } from "./assistant-data.server";
-import { buildAssistantContextWindow } from "./assistant-context.server";
+import {
+  buildAssistantContextWindow,
+  combineAssistantContext,
+} from "./assistant-context.server";
 import { generateAssistantAnswer } from "./assistant-llm.server";
 import { assistantError, assistantLog } from "./assistant-debug";
 import { searchRelevantMeetings } from "./assistant-search";
@@ -66,7 +73,10 @@ export const askAssistantFn = createServerFn({ method: "POST" })
     assistantLog("query received", { queryPreview: query.slice(0, 200) });
 
     const supabase = getSupabaseServerClient();
-    const corpus = await loadAssistantCorpus(supabase);
+    const [corpus, workspace] = await Promise.all([
+      loadAssistantCorpus(supabase),
+      loadAssistantWorkspaceAnalytics(supabase),
+    ]);
 
     if (corpus.meetings.length === 0) {
       return {
@@ -80,7 +90,9 @@ export const askAssistantFn = createServerFn({ method: "POST" })
 
     const hits = searchRelevantMeetings(query, corpus);
     const sources = buildSources(hits, corpus);
-    const context = buildAssistantContextWindow(hits, corpus);
+    const analyticsContext = buildAssistantAnalyticsContext(workspace);
+    const meetingContext = buildAssistantContextWindow(hits, corpus);
+    const context = combineAssistantContext(analyticsContext, meetingContext);
 
     try {
       const llmAnswer = await generateAssistantAnswer(query, context);

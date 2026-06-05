@@ -2,7 +2,9 @@ import { assistantLog, assistantPreview } from "./assistant-debug";
 import type { AssistantCorpus, AssistantMeetingRecord, AssistantSearchHit } from "./types";
 
 const MAX_SUMMARY_CHARS = 900;
-const MAX_TOTAL_CONTEXT_CHARS = 28_000;
+
+/** Shared budget for analytics + meeting context sent to the LLM. */
+export const ASSISTANT_MAX_CONTEXT_CHARS = 28_000;
 
 function truncate(text: string | null | undefined, max: number): string | null {
   if (!text?.trim()) return null;
@@ -68,15 +70,38 @@ export function buildAssistantContextWindow(
 
   let context = blocks.join("\n\n");
 
-  if (context.length > MAX_TOTAL_CONTEXT_CHARS) {
-    context = `${context.slice(0, MAX_TOTAL_CONTEXT_CHARS)}\n\n[Context truncated for model limits]`;
-  }
-
-  assistantLog("context window built", {
+  assistantLog("meeting context built", {
     meetingBlocks: hits.length,
     contextLength: context.length,
     preview: assistantPreview(context, 600),
   });
 
   return context;
+}
+
+export function combineAssistantContext(
+  analyticsContext: string,
+  meetingContext: string,
+): string {
+  const analyticsHeader = "=== WORKSPACE ANALYTICS (pre-computed) ===\n";
+  const meetingsHeader = "\n\n=== RELEVANT MEETINGS ===\n";
+  const prefix = `${analyticsHeader}${analyticsContext}${meetingsHeader}`;
+  let combined = `${prefix}${meetingContext}`;
+
+  if (combined.length > ASSISTANT_MAX_CONTEXT_CHARS) {
+    const budget = ASSISTANT_MAX_CONTEXT_CHARS - prefix.length - 48;
+    const trimmedMeetings =
+      budget > 0
+        ? meetingContext.slice(0, budget)
+        : "";
+    combined = `${prefix}${trimmedMeetings}\n\n[Meeting context truncated for model limits]`;
+  }
+
+  assistantLog("full context combined", {
+    analyticsLength: analyticsContext.length,
+    meetingLength: meetingContext.length,
+    combinedLength: combined.length,
+  });
+
+  return combined;
 }
