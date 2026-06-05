@@ -113,8 +113,10 @@ export function AuthShell({
               Auto-transcribe, summarize and extract action items — then watch them flow into your team's tasks in real time.
             </p>
             <motion.div className="mt-8 rounded-2xl border border-white/15 bg-white/10 p-5 backdrop-blur">
-              <p className="text-sm italic">"We replaced three tools with {PRODUCT_NAME}. Our weekly syncs feel 2x faster."</p>
-              <motion.div className="mt-3 text-xs opacity-80">— Maya L., Head of Operations at Linear</motion.div>
+              <p className="text-base font-semibold leading-snug">Turn every meeting into action.</p>
+              <p className="mt-3 text-sm text-primary-foreground/80">
+                Automatically transcribe meetings, generate AI summaries, extract action items, and sync work back to your team.
+              </p>
             </motion.div>
           </motion.div>
           <motion.div className="text-xs opacity-60">© 2026 {PRODUCT_NAME}</motion.div>
