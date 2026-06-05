@@ -1,11 +1,9 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, Download, Loader2, Sparkles } from "lucide-react";
-import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAppStore } from "@/store/app-store";
 import { formatFileSize, formatMeetingDate, fileExtensionLabel } from "@/lib/meetings/validation";
 import type { MeetingRecord } from "@/lib/meetings/types";
 import type { MeetingPipelineDisplay } from "@/lib/meetings/meeting-display";
@@ -36,7 +34,6 @@ export function MeetingDetailView({
   reminderStatus,
   onReminderStatusChange,
 }: MeetingDetailViewProps) {
-  const { openCopilotForMeeting } = useAppStore();
   const isVideo = upload.mime_type.startsWith("video/");
 
   return (
@@ -88,17 +85,13 @@ export function MeetingDetailView({
             )}
             <Button
               size="sm"
-              type="button"
               className="bg-gradient-primary text-primary-foreground hover:opacity-90"
-              onClick={() => {
-                openCopilotForMeeting(upload.id, upload.title);
-                toast.message("Copilot ready for this meeting", {
-                  description: upload.title,
-                });
-              }}
+              asChild
             >
-              <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-              Ask Copilot
+              <Link to="/assistant" search={{ meetingId: upload.id }}>
+                <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                Ask Assistant
+              </Link>
             </Button>
           </div>
         </div>

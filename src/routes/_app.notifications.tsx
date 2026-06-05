@@ -29,7 +29,7 @@ function NotificationsPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Notifications</h1>
           <p className="text-sm text-muted-foreground">
-            Stay on top of what your team and Copilot are doing.
+            Stay on top of what your team and Assistant are doing.
           </p>
         </div>
         <Button

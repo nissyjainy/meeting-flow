@@ -8,8 +8,12 @@ import { useAssistant } from "@/hooks/use-assistant";
 import { ASSISTANT_SUGGESTIONS } from "@/lib/assistant/suggestions";
 import { cn } from "@/lib/utils";
 
-export function AssistantChat() {
-  const { messages, submitQuery, isLoading } = useAssistant();
+type AssistantChatProps = {
+  meetingId?: string;
+};
+
+export function AssistantChat({ meetingId }: AssistantChatProps) {
+  const { messages, submitQuery, isLoading } = useAssistant({ meetingId });
   const [draft, setDraft] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -37,10 +41,27 @@ export function AssistantChat() {
           <div>
             <h1 className="text-lg font-semibold tracking-tight">MeetFlow Assistant</h1>
             <p className="text-sm text-muted-foreground">
-              Ask questions across all your meetings, transcripts, summaries, and action items.
+              {meetingId
+                ? "Focused on one meeting — summaries, action items, owners, and deadlines."
+                : "Ask questions across all your meetings, transcripts, summaries, and action items."}
             </p>
           </div>
         </div>
+        {meetingId ? (
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span>Meeting focus active.</span>
+            <Link
+              to="/meetings/$id"
+              params={{ id: meetingId }}
+              className="font-medium text-primary hover:underline"
+            >
+              View meeting
+            </Link>
+            <Link to="/assistant" className="hover:text-foreground hover:underline">
+              Clear focus
+            </Link>
+          </div>
+        ) : null}
       </div>
 
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-5 sm:px-6">
@@ -110,7 +131,7 @@ export function AssistantChat() {
           <Input
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
-            placeholder="Ask across all meetings…"
+            placeholder={meetingId ? "Ask about this meeting…" : "Ask across all meetings…"}
             className="flex-1"
             disabled={isLoading}
           />

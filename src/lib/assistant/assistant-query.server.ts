@@ -12,11 +12,12 @@ import {
 } from "./assistant-context.server";
 import { generateAssistantAnswer } from "./assistant-llm.server";
 import { assistantError, assistantLog } from "./assistant-debug";
-import { searchRelevantMeetings } from "./assistant-search";
+import { pinMeetingInSearchHits, searchRelevantMeetings } from "./assistant-search";
 import type { AssistantQueryResult, AssistantSource } from "./types";
 
 const AssistantQueryInput = z.object({
   query: z.string().min(1).max(1000),
+  meetingId: z.string().uuid().optional(),
 });
 
 function parseAssistantInput(raw: unknown): z.infer<typeof AssistantQueryInput> {
@@ -88,7 +89,10 @@ export const askAssistantFn = createServerFn({ method: "POST" })
       };
     }
 
-    const hits = searchRelevantMeetings(query, corpus);
+    let hits = searchRelevantMeetings(query, corpus);
+    if (data.meetingId) {
+      hits = pinMeetingInSearchHits(data.meetingId, hits, corpus);
+    }
     const sources = buildSources(hits, corpus);
     const analyticsContext = buildAssistantAnalyticsContext(workspace);
     const meetingContext = buildAssistantContextWindow(hits, corpus);

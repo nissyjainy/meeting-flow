@@ -28,7 +28,7 @@ function initials(name: string | null, email: string) {
 }
 
 export function Topbar() {
-  const { theme, toggleTheme, toggleCopilot } = useAppStore();
+  const { theme, toggleTheme } = useAppStore();
   const { notifications, unreadCount, markAllRead } = useNotifications();
   const { openUploadDialog, isProcessing } = useMeetingUploadTrigger();
   const { user } = useRouteContext({ from: "__root__" });
@@ -56,8 +56,10 @@ export function Topbar() {
           )}
           {isProcessing ? "Uploading…" : "Upload"}
         </Button>
-        <Button variant="ghost" size="icon" onClick={toggleCopilot} title="AI Copilot">
-          <Sparkles className="h-4 w-4 text-primary" />
+        <Button variant="ghost" size="icon" asChild title="Assistant">
+          <Link to="/assistant">
+            <Sparkles className="h-4 w-4 text-primary" />
+          </Link>
         </Button>
         <Button variant="ghost" size="icon" onClick={toggleTheme} title="Toggle theme">
           {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}

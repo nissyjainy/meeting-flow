@@ -8,7 +8,7 @@ AI meeting intelligence for modern teams. MeetFlow transcribes recordings, gener
 - **Tasks & reminders** — Track action items and send owner reminder emails via Resend
 - **Google Calendar** — Import upcoming meetings (read-only OAuth)
 - **Team insights** — Per-owner accountability metrics and execution health dashboards
-- **AI Copilot** — Ask questions about your meetings and tasks (partial MVP)
+- **AI Assistant** — Cross-meeting Q&A, summaries, action items, and workspace analytics
 
 ## Getting started
 

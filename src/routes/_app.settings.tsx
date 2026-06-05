@@ -23,7 +23,7 @@ function isSettingsTab(value: string | undefined): value is SettingsTab {
 }
 
 function isVisibleSettingsTab(tab: SettingsTab): boolean {
-  if (tab === "ai") return featureFlags.settingsAiCopilotTab;
+  if (tab === "ai") return featureFlags.settingsAiAssistantTab;
   if (tab === "billing") return featureFlags.settingsBillingTab;
   return true;
 }
@@ -95,8 +95,8 @@ function SettingsPage() {
         <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
           <TabsTrigger value="account">Account</TabsTrigger>
           <TabsTrigger value="workspace">Workspace</TabsTrigger>
-          {featureFlags.settingsAiCopilotTab ? (
-            <SettingsTabTrigger value="ai" label="AI Copilot" />
+          {featureFlags.settingsAiAssistantTab ? (
+            <SettingsTabTrigger value="ai" label="Assistant" />
           ) : null}
           <TabsTrigger value="integrations">Integrations</TabsTrigger>
           {featureFlags.settingsBillingTab ? (
@@ -170,11 +170,11 @@ function SettingsPage() {
           />
         </TabsContent>
 
-        {featureFlags.settingsAiCopilotTab ? (
+        {featureFlags.settingsAiAssistantTab ? (
           <TabsContent value="ai" className="mt-5 space-y-3">
             <ComingSoonCard
-              title="Copilot settings"
-              description="Meeting Copilot is available today from the panel on the right — ask about summaries, action items, owners, and deadlines on any meeting page. Preferences such as summary tone, default prompts, and workspace-wide Copilot policies will be configurable here in a future release."
+              title="Assistant settings"
+              description="MeetFlow Assistant is available from the sidebar or any meeting page — ask about summaries, action items, owners, deadlines, and workspace analytics. Preferences such as summary tone, default prompts, and workspace-wide Assistant policies will be configurable here in a future release."
             />
           </TabsContent>
         ) : null}

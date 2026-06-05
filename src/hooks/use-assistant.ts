@@ -10,7 +10,12 @@ function createMessageId(): string {
   return `assistant-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function useAssistant() {
+type UseAssistantOptions = {
+  meetingId?: string;
+};
+
+export function useAssistant(options: UseAssistantOptions = {}) {
+  const meetingId = options.meetingId;
   const [messages, setMessages] = useState<AssistantMessage[]>([
     {
       id: createMessageId(),
@@ -20,7 +25,13 @@ export function useAssistant() {
   ]);
 
   const mutation = useMutation({
-    mutationFn: (query: string) => askAssistantFn({ data: { query } }),
+    mutationFn: (query: string) =>
+      askAssistantFn({
+        data: {
+          query,
+          ...(meetingId ? { meetingId } : {}),
+        },
+      }),
   });
 
   const submitQuery = useCallback(

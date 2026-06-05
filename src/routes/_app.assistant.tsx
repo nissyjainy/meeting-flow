@@ -3,6 +3,9 @@ import { AssistantChat } from "@/components/assistant/AssistantChat";
 import { pageTitle } from "@/lib/branding";
 
 export const Route = createFileRoute("/_app/assistant")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    meetingId: typeof search.meetingId === "string" ? search.meetingId : undefined,
+  }),
   head: () => ({
     meta: [
       { title: pageTitle("Assistant") },
@@ -17,5 +20,6 @@ export const Route = createFileRoute("/_app/assistant")({
 });
 
 function AssistantPage() {
-  return <AssistantChat />;
+  const { meetingId } = Route.useSearch();
+  return <AssistantChat meetingId={meetingId} />;
 }

@@ -2,7 +2,6 @@ import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { normalizeAuthRedirectPath } from "@/lib/auth/redirect-path";
 import { AppSidebar } from "@/components/app/Sidebar";
 import { Topbar } from "@/components/app/Topbar";
-import { CopilotPanel } from "@/components/app/CopilotPanel";
 import { MeetingUploadProvider } from "@/providers/meeting-upload-provider";
 
 export const Route = createFileRoute("/_app")({
@@ -28,7 +27,6 @@ function AppLayout() {
             <Outlet />
           </main>
         </div>
-        <CopilotPanel />
       </div>
     </MeetingUploadProvider>
   );

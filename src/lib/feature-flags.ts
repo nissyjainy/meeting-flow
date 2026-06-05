@@ -3,7 +3,7 @@
  * When `true`, roadmap tabs show a "Coming Soon" badge and placeholder content.
  */
 export const featureFlags = {
-  settingsAiCopilotTab: true,
+  settingsAiAssistantTab: true,
   settingsBillingTab: true,
 } as const;
 

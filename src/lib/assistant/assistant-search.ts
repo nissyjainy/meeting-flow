@@ -298,3 +298,26 @@ export function searchRelevantMeetings(
 ): AssistantSearchHit[] {
   return strategy.search(query, corpus, limit);
 }
+
+/** When opened from a meeting page, keep that meeting in context even if keyword scores are low. */
+export function pinMeetingInSearchHits(
+  meetingId: string,
+  hits: AssistantSearchHit[],
+  corpus: AssistantCorpus,
+  limit = DEFAULT_MAX_SEARCH_RESULTS,
+): AssistantSearchHit[] {
+  const meeting = corpus.meetings.find((entry) => entry.meetingId === meetingId);
+  if (!meeting) return hits;
+
+  const withoutPinned = hits.filter((hit) => hit.meetingId !== meetingId);
+  const pinned: AssistantSearchHit = {
+    meetingId,
+    score: 10_000,
+    matchedFields: ["focused"],
+    transcriptSnippet: meeting.transcript
+      ? meeting.transcript.slice(0, TRANSCRIPT_SNIPPET_RADIUS * 2)
+      : null,
+  };
+
+  return [pinned, ...withoutPinned].slice(0, limit);
+}

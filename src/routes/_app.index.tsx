@@ -27,7 +27,6 @@ import { StatCard } from "@/components/dashboard/StatCard";
 import { ExecutionSummaryWidget } from "@/components/dashboard/ExecutionSummaryWidget";
 import { useDashboardAnalytics } from "@/hooks/use-dashboard-analytics";
 import { useMeetingUploadTrigger } from "@/providers/meeting-upload-provider";
-import { useAppStore } from "@/store/app-store";
 import { cn } from "@/lib/utils";
 import { pageTitle } from "@/lib/branding";
 
@@ -72,7 +71,6 @@ function StatCardsSkeleton() {
 function Dashboard() {
   const { user } = useRouteContext({ from: "__root__" });
   const { openUploadDialog, isProcessing } = useMeetingUploadTrigger();
-  const { toggleCopilot } = useAppStore();
   const { data, isLoading, isError, refetch } = useDashboardAnalytics();
 
   const displayName = user ? greetingName(user.fullName, user.email) : "there";
@@ -128,12 +126,13 @@ function Dashboard() {
             )}
           </Button>
           <Button
-            type="button"
             size="sm"
             className="bg-gradient-primary text-primary-foreground hover:opacity-90"
-            onClick={() => toggleCopilot()}
+            asChild
           >
-            <Sparkles className="mr-1.5 h-3.5 w-3.5" /> Ask Copilot
+            <Link to="/assistant">
+              <Sparkles className="mr-1.5 h-3.5 w-3.5" /> Ask Assistant
+            </Link>
           </Button>
         </div>
       </div>
