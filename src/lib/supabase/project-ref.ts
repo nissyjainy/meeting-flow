@@ -1,3 +1,19 @@
+/** Extract the `ref` claim from a Supabase JWT (service role or anon). */
+export function extractJwtProjectRef(token: string | undefined): string | null {
+  if (!token?.trim()) return null;
+
+  const parts = token.trim().split(".");
+  if (parts.length < 2) return null;
+
+  try {
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const payload = JSON.parse(atob(base64)) as { ref?: unknown };
+    return typeof payload.ref === "string" && payload.ref.trim() ? payload.ref.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Extract the Supabase project ref from a project URL (e.g. `uzddznccxnolcarxykbc`). */
 export function extractSupabaseProjectRef(url: string | undefined): string | null {
   if (!url?.trim()) return null;

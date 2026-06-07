@@ -1,9 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
+  extractJwtProjectRef,
   extractSupabaseProjectRef,
   formatSupabaseSchemaError,
   isSupabaseSchemaCacheError,
 } from "./project-ref";
+
+const SERVICE_ROLE_SAMPLE =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6ZGR6bmNjeG5vbGNhcnh5a2JjIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3OTE5ODYxOCwiZXhwIjoyMDk0Nzc0NjE4fQ.test";
+
+describe("extractJwtProjectRef", () => {
+  it("extracts ref from a Supabase service role JWT", () => {
+    expect(extractJwtProjectRef(SERVICE_ROLE_SAMPLE)).toBe("uzddznccxnolcarxykbc");
+  });
+});
 
 describe("extractSupabaseProjectRef", () => {
   it("extracts the project ref from a Supabase URL", () => {

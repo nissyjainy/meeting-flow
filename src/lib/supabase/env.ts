@@ -1,4 +1,5 @@
 import { readServerEnv } from "@/lib/server-env";
+import { extractJwtProjectRef, extractSupabaseProjectRef } from "./project-ref";
 
 function readClientEnv(key: string): string | undefined {
   try {
@@ -10,7 +11,21 @@ function readClientEnv(key: string): string | undefined {
 }
 
 function resolveSupabaseUrl(): string | undefined {
-  return readServerEnv("VITE_SUPABASE_URL") ?? readClientEnv("VITE_SUPABASE_URL");
+  const fromWorker = readServerEnv("VITE_SUPABASE_URL");
+  const fromClient = readClientEnv("VITE_SUPABASE_URL");
+  const resolved = fromWorker ?? fromClient;
+
+  const serviceRoleRef = extractJwtProjectRef(readServerEnv("SUPABASE_SERVICE_ROLE_KEY"));
+  if (!serviceRoleRef) return resolved;
+
+  const resolvedRef = extractSupabaseProjectRef(resolved);
+  if (resolvedRef === serviceRoleRef) return resolved;
+
+  const aligned = `https://${serviceRoleRef}.supabase.co`;
+  console.warn(
+    `[supabase-env] VITE_SUPABASE_URL ref ${resolvedRef ?? "(none)"} mismatches SUPABASE_SERVICE_ROLE_KEY ref ${serviceRoleRef}; using ${aligned}`,
+  );
+  return aligned;
 }
 
 function resolveSupabasePublishableKey(): string | undefined {
