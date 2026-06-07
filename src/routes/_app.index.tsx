@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { ExecutionSummaryWidget } from "@/components/dashboard/ExecutionSummaryWidget";
+import { SyncedMeetingsWidget } from "@/components/dashboard/SyncedMeetingsWidget";
 import { useDashboardAnalytics } from "@/hooks/use-dashboard-analytics";
 import { useMeetingUploadTrigger } from "@/providers/meeting-upload-provider";
 import { cn } from "@/lib/utils";
@@ -178,6 +179,8 @@ function Dashboard() {
         onUpload={() => openUploadDialog()}
         isProcessing={isProcessing}
       />
+
+      <SyncedMeetingsWidget />
 
       <section className="mt-8">
         <Card className="overflow-hidden border-border/80 bg-muted/10 p-4 shadow-none sm:p-5">

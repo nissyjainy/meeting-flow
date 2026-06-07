@@ -1,3 +1,4 @@
+import { extractGoogleMeetCode } from "@/lib/meetings/extract-google-meet-code";
 import { extractCalendarMeetingLink } from "./extract-calendar-meeting-link";
 import type { NormalizedGoogleCalendarEvent } from "./types";
 
@@ -7,10 +8,16 @@ type GoogleCalendarAttendee = {
   responseStatus?: string;
 };
 
+type GoogleCalendarOrganizer = {
+  email?: string;
+  displayName?: string;
+};
+
 type GoogleCalendarEventItem = {
   id?: string;
   status?: string;
   summary?: string;
+  organizer?: GoogleCalendarOrganizer;
   start?: { dateTime?: string; date?: string };
   end?: { dateTime?: string; date?: string };
   attendees?: GoogleCalendarAttendee[];
@@ -18,6 +25,7 @@ type GoogleCalendarEventItem = {
   location?: string;
   description?: string;
   conferenceData?: {
+    conferenceId?: string;
     entryPoints?: Array<{ entryPointType?: string; uri?: string }>;
   };
 };
@@ -66,22 +74,27 @@ function normalizeGoogleEvent(
     .filter((attendee) => attendee.email.length > 0);
 
   const { meetingUrl, platform } = extractCalendarMeetingLink(event);
+  if (platform !== "Google Meet" || !meetingUrl) return null;
 
   return {
     googleEventId,
     googleCalendarId: calendarId,
     title: event.summary?.trim() || "Untitled meeting",
+    organizerEmail: event.organizer?.email?.trim() || null,
+    organizerName: event.organizer?.displayName?.trim() || null,
     startsAt,
     endsAt,
     attendees,
     meetLink: meetingUrl,
     meetingUrl,
+    meetingCode: extractGoogleMeetCode(meetingUrl),
+    googleConferenceId: event.conferenceData?.conferenceId?.trim() || null,
     platform,
     cancelled: event.status === "cancelled",
   };
 }
 
-export async function fetchUpcomingGoogleCalendarEvents(
+export async function fetchGoogleCalendarMeetEvents(
   accessToken: string,
   options: { timeMin: string; timeMax: string; calendarId?: string },
 ): Promise<NormalizedGoogleCalendarEvent[]> {

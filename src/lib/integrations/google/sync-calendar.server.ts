@@ -1,5 +1,5 @@
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
-import { fetchUpcomingGoogleCalendarEvents } from "./calendar-client";
+import { fetchGoogleCalendarMeetEvents } from "./calendar-client";
 import { getGoogleOAuthConfig } from "./env";
 import { refreshGoogleAccessToken, tokenExpiresAt } from "./oauth";
 import type {
@@ -7,12 +7,14 @@ import type {
   GoogleCalendarSyncResult,
   NormalizedGoogleCalendarEvent,
 } from "./types";
-import { GOOGLE_CALENDAR_READONLY_SCOPE } from "./types";
+import { GOOGLE_INTEGRATION_SCOPES } from "./scopes";
 
 const CALENDAR_EVENT_COLUMNS =
-  "id,user_id,google_event_id,google_calendar_id,title,starts_at,ends_at,attendees,meet_link,platform,meeting_url,status,linked_meeting_id,synced_at,created_at,updated_at";
+  "id,user_id,google_event_id,google_calendar_id,title,organizer_email,organizer_name,starts_at,ends_at,attendees,meet_link,platform,meeting_url,meeting_code,google_conference_id,capture_status,transcript_status,status,linked_meeting_id,synced_at,created_at,updated_at";
 
-async function loadConnection(userId: string): Promise<GoogleCalendarConnectionRow | null> {
+export async function loadGoogleCalendarConnection(
+  userId: string,
+): Promise<GoogleCalendarConnectionRow | null> {
   const admin = getSupabaseAdminClient();
   if (!admin) {
     throw new Error("SUPABASE_SERVICE_ROLE_KEY is required for Google Calendar sync.");
@@ -33,7 +35,7 @@ async function loadConnection(userId: string): Promise<GoogleCalendarConnectionR
   return (data as GoogleCalendarConnectionRow | null) ?? null;
 }
 
-async function ensureFreshAccessToken(
+export async function ensureFreshGoogleAccessToken(
   connection: GoogleCalendarConnectionRow,
 ): Promise<{ accessToken: string; connection: GoogleCalendarConnectionRow }> {
   const config = getGoogleOAuthConfig();
@@ -75,8 +77,11 @@ async function ensureFreshAccessToken(
   return { accessToken: nextConnection.access_token, connection: nextConnection };
 }
 
-function buildSyncWindow(horizonDays: number): { timeMin: string; timeMax: string } {
-  const timeMin = new Date().toISOString();
+function buildSyncWindow(
+  horizonDays: number,
+  lookbackDays: number,
+): { timeMin: string; timeMax: string } {
+  const timeMin = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000).toISOString();
   const timeMax = new Date(Date.now() + horizonDays * 24 * 60 * 60 * 1000).toISOString();
   return { timeMin, timeMax };
 }
@@ -112,12 +117,17 @@ async function upsertCalendarEvents(
       google_event_id: event.googleEventId,
       google_calendar_id: event.googleCalendarId,
       title: event.title,
+      organizer_email: event.organizerEmail,
+      organizer_name: event.organizerName,
       starts_at: event.startsAt,
       ends_at: event.endsAt,
       attendees: event.attendees,
       meet_link: event.meetingUrl,
       platform: event.platform,
       meeting_url: event.meetingUrl,
+      meeting_code: event.meetingCode,
+      google_conference_id: event.googleConferenceId,
+      capture_status: "discovered",
       status: event.cancelled ? "cancelled" : "scheduled",
       synced_at: nowIso,
     };
@@ -134,7 +144,11 @@ async function upsertCalendarEvents(
   }
 
   const activeIds = new Set(events.map((event) => event.googleEventId));
-  const { timeMin, timeMax } = buildSyncWindow(getGoogleOAuthConfig()?.syncHorizonDays ?? 30);
+  const syncConfig = getGoogleOAuthConfig();
+  const { timeMin, timeMax } = buildSyncWindow(
+    syncConfig?.syncHorizonDays ?? 30,
+    syncConfig?.syncLookbackDays ?? 14,
+  );
 
   const { data: storedEvents, error: storedError } = await admin
     .from("calendar_events")
@@ -189,7 +203,7 @@ export async function syncGoogleCalendarForUser(userId: string): Promise<GoogleC
   }
 
   try {
-    const connection = await loadConnection(userId);
+    const connection = await loadGoogleCalendarConnection(userId);
     if (!connection) {
       return {
         success: false,
@@ -200,9 +214,9 @@ export async function syncGoogleCalendarForUser(userId: string): Promise<GoogleC
       };
     }
 
-    const { accessToken } = await ensureFreshAccessToken(connection);
-    const { timeMin, timeMax } = buildSyncWindow(config.syncHorizonDays);
-    const events = await fetchUpcomingGoogleCalendarEvents(accessToken, { timeMin, timeMax });
+    const { accessToken } = await ensureFreshGoogleAccessToken(connection);
+    const { timeMin, timeMax } = buildSyncWindow(config.syncHorizonDays, config.syncLookbackDays);
+    const events = await fetchGoogleCalendarMeetEvents(accessToken, { timeMin, timeMax });
     const counts = await upsertCalendarEvents(userId, events);
 
     await admin
@@ -254,7 +268,7 @@ export async function saveGoogleCalendarConnection(input: {
       access_token: input.accessToken,
       refresh_token: input.refreshToken,
       token_expires_at: tokenExpiresAt(input.expiresIn),
-      scopes: [GOOGLE_CALENDAR_READONLY_SCOPE],
+      scopes: [...GOOGLE_INTEGRATION_SCOPES],
       connected_at: new Date().toISOString(),
       last_sync_error: null,
     },

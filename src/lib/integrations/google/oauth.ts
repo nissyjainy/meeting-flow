@@ -1,4 +1,5 @@
-import { GOOGLE_CALENDAR_READONLY_SCOPE, type GoogleTokenResponse } from "./types";
+import { googleOAuthScopeParam } from "./scopes";
+import type { GoogleTokenResponse } from "./types";
 import type { GoogleOAuthConfig } from "./env";
 
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -10,7 +11,7 @@ export function buildGoogleOAuthUrl(config: GoogleOAuthConfig, state: string): s
     client_id: config.clientId,
     redirect_uri: config.redirectUri,
     response_type: "code",
-    scope: GOOGLE_CALENDAR_READONLY_SCOPE,
+    scope: googleOAuthScopeParam(),
     access_type: "offline",
     prompt: "consent",
     include_granted_scopes: "true",

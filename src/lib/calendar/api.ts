@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { CalendarAttendee, CalendarEventRecord } from "./types";
 
 export const CALENDAR_EVENT_COLUMNS =
-  "id,user_id,google_event_id,google_calendar_id,title,starts_at,ends_at,attendees,meet_link,platform,meeting_url,status,linked_meeting_id,synced_at,created_at,updated_at";
+  "id,user_id,google_event_id,google_calendar_id,title,organizer_email,organizer_name,starts_at,ends_at,attendees,meet_link,platform,meeting_url,meeting_code,google_conference_id,capture_status,transcript_status,status,linked_meeting_id,synced_at,created_at,updated_at";
 
 const MEETING_PLATFORMS = new Set(["Zoom", "Google Meet", "Microsoft Teams", "Unknown"]);
 
@@ -42,18 +42,40 @@ export function mapCalendarEventRow(row: Record<string, unknown>): CalendarEvent
         ? String(row.meet_link)
         : null;
 
+  const captureStatus = row.capture_status;
+  const transcriptStatus = row.transcript_status;
+
   return {
     id,
     user_id: String(row.user_id),
     google_event_id: String(row.google_event_id),
     google_calendar_id: String(row.google_calendar_id ?? "primary"),
     title,
+    organizer_email: row.organizer_email != null ? String(row.organizer_email) : null,
+    organizer_name: row.organizer_name != null ? String(row.organizer_name) : null,
     starts_at: String(row.starts_at),
     ends_at: String(row.ends_at),
     attendees: mapAttendees(row.attendees),
     meet_link: meetingUrl,
     platform: mapMeetingPlatform(row.platform),
     meeting_url: meetingUrl,
+    meeting_code: row.meeting_code != null ? String(row.meeting_code) : null,
+    google_conference_id:
+      row.google_conference_id != null ? String(row.google_conference_id) : null,
+    capture_status:
+      captureStatus === "pending_capture" ||
+      captureStatus === "capturing" ||
+      captureStatus === "captured" ||
+      captureStatus === "failed"
+        ? captureStatus
+        : "discovered",
+    transcript_status:
+      transcriptStatus === "queued" ||
+      transcriptStatus === "processing" ||
+      transcriptStatus === "completed" ||
+      transcriptStatus === "failed"
+        ? transcriptStatus
+        : "not_started",
     status: row.status === "cancelled" ? "cancelled" : "scheduled",
     linked_meeting_id: row.linked_meeting_id != null ? String(row.linked_meeting_id) : null,
     synced_at: String(row.synced_at),

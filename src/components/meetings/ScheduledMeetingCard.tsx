@@ -1,7 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { Calendar, ExternalLink, Sparkles, Users, Video } from "lucide-react";
+import { ExternalLink, Sparkles, Users, Video } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { CalendarLifecycleBadge } from "@/components/meetings/CalendarLifecycleBadge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -43,17 +44,17 @@ export function ScheduledMeetingCard({ event, index, taskCount }: ScheduledMeeti
                 {formatScheduledRange(event.starts_at, event.ends_at)}
               </div>
             </div>
-            <Badge variant="secondary" className="shrink-0 gap-1">
-              <Calendar className="h-3 w-3" />
-              Scheduled
-            </Badge>
+            <CalendarLifecycleBadge event={event} />
           </div>
 
           <p className="mt-3 line-clamp-2 min-h-[2.5rem] text-xs text-muted-foreground">
-            {event.attendees.length > 0
-              ? `${event.attendees.length} attendee${event.attendees.length === 1 ? "" : "s"}`
-              : "No attendees listed"}
-            {meetingUrl ? ` · ${platformLabel} link available` : ""}
+            {(event.organizer_name ?? event.organizer_email)
+              ? `Organizer: ${event.organizer_name ?? event.organizer_email}`
+              : event.attendees.length > 0
+                ? `${event.attendees.length} attendee${event.attendees.length === 1 ? "" : "s"}`
+                : "No organizer listed"}
+            {event.meeting_code ? ` · Code ${event.meeting_code}` : ""}
+            {meetingUrl ? ` · ${platformLabel}` : ""}
           </p>
 
           <div className="mt-3 flex flex-wrap gap-1.5">

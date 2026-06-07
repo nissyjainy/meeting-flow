@@ -1,5 +1,6 @@
 import type { MeetingRecord } from "@/lib/meetings/types";
 import { getPipelineDisplayStatus } from "@/lib/meetings/meeting-display";
+import { getCalendarMeetingLifecycle } from "./meeting-lifecycle";
 import type { CalendarEventRecord, MeetingFilter, MeetingsListItem } from "./types";
 
 export function buildMeetingsListItems(
@@ -50,7 +51,9 @@ export function listItemMatchesFilter(item: MeetingsListItem, filter: MeetingFil
   if (filter === "all") return true;
 
   if (filter === "scheduled") {
-    return item.kind === "scheduled" && isUpcomingScheduledEvent(item.event);
+    if (item.kind !== "scheduled") return false;
+    const lifecycle = getCalendarMeetingLifecycle(item.event);
+    return lifecycle === "upcoming" || lifecycle === "in_progress";
   }
 
   if (item.kind === "scheduled") return false;

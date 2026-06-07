@@ -75,7 +75,7 @@ function SettingsPage() {
   useEffect(() => {
     if (connected) {
       toast.success("Google Calendar connected", {
-        description: "Upcoming meetings will appear under Scheduled.",
+        description: "Google Meet events will appear on your dashboard and under Meetings.",
       });
     }
   }, [connected]);

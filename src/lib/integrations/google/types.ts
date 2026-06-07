@@ -1,5 +1,3 @@
-export const GOOGLE_CALENDAR_READONLY_SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
-
 export type GoogleTokenResponse = {
   access_token: string;
   refresh_token?: string;
@@ -26,6 +24,8 @@ export type GoogleCalendarConnectionStatus = {
   connectedAt: string | null;
   lastSyncedAt: string | null;
   lastSyncError: string | null;
+  hasMeetTranscriptScope: boolean;
+  needsReconnect: boolean;
 };
 
 export type GoogleCalendarSyncResult = {
@@ -42,6 +42,8 @@ export type NormalizedGoogleCalendarEvent = {
   googleEventId: string;
   googleCalendarId: string;
   title: string;
+  organizerEmail: string | null;
+  organizerName: string | null;
   startsAt: string;
   endsAt: string;
   attendees: Array<{
@@ -52,6 +54,8 @@ export type NormalizedGoogleCalendarEvent = {
   /** @deprecated Use meetingUrl — kept for backward compatibility during sync. */
   meetLink: string | null;
   meetingUrl: string | null;
+  meetingCode: string | null;
+  googleConferenceId: string | null;
   platform: MeetingPlatform | null;
   cancelled: boolean;
 };

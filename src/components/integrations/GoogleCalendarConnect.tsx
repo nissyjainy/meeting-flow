@@ -28,6 +28,7 @@ export function GoogleCalendarConnect() {
 
   const configured = data?.configured ?? false;
   const connected = data?.connected ?? false;
+  const needsReconnect = data?.needsReconnect ?? false;
   const syncFailed = Boolean(data?.lastSyncError) && !connected;
 
   return (
@@ -41,7 +42,7 @@ export function GoogleCalendarConnect() {
             <div>
               <div className="text-sm font-semibold">Google Calendar</div>
               <div className="text-xs text-muted-foreground">
-                Read-only import of upcoming meetings
+                Read-only sync of Google Meet calendar events
               </div>
             </div>
           </div>
@@ -86,6 +87,26 @@ export function GoogleCalendarConnect() {
               <dd className="mt-0.5 font-medium">{formatTimestamp(data?.lastSyncedAt ?? null)}</dd>
             </div>
           </dl>
+
+          {needsReconnect ? (
+            <div className="rounded-lg border border-warning/40 bg-warning/5 px-3 py-3">
+              <p className="text-sm text-foreground">
+                Reconnect Google to enable transcript capture.
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Your connection was created before Meet transcript access was added. Reconnect to
+                grant read-only Google Meet access.
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                className="mt-3 bg-gradient-primary text-primary-foreground hover:opacity-90"
+                asChild
+              >
+                <a href="/api/integrations/google/connect">Reconnect Google</a>
+              </Button>
+            </div>
+          ) : null}
 
           {data?.lastSyncError ? (
             <p className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
@@ -154,8 +175,8 @@ export function GoogleCalendarConnect() {
       ) : (
         <div className="mt-4 space-y-3">
           <p className="text-sm text-muted-foreground">
-            Connect your Google Calendar to import upcoming meetings into the Scheduled tab on
-            Meetings. {PRODUCT_NAME} requests read-only calendar access only.
+            Connect your Google Calendar to discover Google Meet meetings and fetch transcripts after
+            meetings end. {PRODUCT_NAME} requests read-only Calendar and Meet access.
           </p>
           <Button type="button" size="sm" asChild className="bg-gradient-primary text-primary-foreground hover:opacity-90">
             <a href="/api/integrations/google/connect">Connect Google Calendar</a>
