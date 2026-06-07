@@ -1,5 +1,13 @@
 export const GOOGLE_OAUTH_CALLBACK_PATH = "/api/integrations/google/callback";
 
+export function isCanonicalGoogleOAuthCallback(redirectUri: string): boolean {
+  try {
+    return new URL(redirectUri).pathname === GOOGLE_OAUTH_CALLBACK_PATH;
+  } catch {
+    return false;
+  }
+}
+
 function originOf(url: string): string | null {
   try {
     return new URL(url).origin;
@@ -49,10 +57,13 @@ export function resolveGoogleOAuthRedirectUri(
   const requestDerived = googleOAuthRedirectUriFromRequest(requestUrl);
   const requestOrigin = originOf(requestUrl);
   if (!requestOrigin) {
-    return explicit || fallback;
+    if (explicit && isCanonicalGoogleOAuthCallback(explicit)) {
+      return explicit;
+    }
+    return fallback;
   }
 
-  if (explicit) {
+  if (explicit && isCanonicalGoogleOAuthCallback(explicit)) {
     const explicitOrigin = originOf(explicit);
     if (
       explicitOrigin &&
@@ -62,6 +73,10 @@ export function resolveGoogleOAuthRedirectUri(
       return requestDerived;
     }
     return explicit;
+  }
+
+  if (explicit && !isCanonicalGoogleOAuthCallback(explicit)) {
+    return requestDerived;
   }
 
   const appOrigin = originOf(appUrl);

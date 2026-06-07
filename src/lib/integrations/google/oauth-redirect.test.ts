@@ -35,6 +35,15 @@ describe("resolveGoogleOAuthRedirectUri", () => {
     ).toBe(PRODUCTION_CALLBACK);
   });
 
+  it("ignores explicit redirect URIs that use the wrong callback path", () => {
+    expect(
+      resolveGoogleOAuthRedirectUri(PRODUCTION_REQUEST, {
+        explicitRedirectUri:
+          "https://meeting-flow.nisargjain.workers.dev/api/auth/callback/google",
+      }),
+    ).toBe(PRODUCTION_CALLBACK);
+  });
+
   it("falls back to APP_URL when no request is available", () => {
     expect(
       resolveGoogleOAuthRedirectUri(undefined, {
