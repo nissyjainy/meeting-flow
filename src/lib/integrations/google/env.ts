@@ -1,4 +1,8 @@
 import { readServerEnv } from "@/lib/server-env";
+import {
+  resolveAppBaseFromRedirectUri,
+  resolveGoogleOAuthRedirectUri,
+} from "./oauth-redirect";
 
 export type GoogleOAuthConfig = {
   clientId: string;
@@ -8,7 +12,7 @@ export type GoogleOAuthConfig = {
   syncLookbackDays: number;
 };
 
-export function getGoogleOAuthConfig(): GoogleOAuthConfig | null {
+export function getGoogleOAuthConfig(requestUrl?: string): GoogleOAuthConfig | null {
   const clientId = readServerEnv("GOOGLE_CLIENT_ID");
   const clientSecret = readServerEnv("GOOGLE_CLIENT_SECRET");
 
@@ -16,10 +20,10 @@ export function getGoogleOAuthConfig(): GoogleOAuthConfig | null {
     return null;
   }
 
-  const appUrl = readServerEnv("APP_URL") ?? "http://localhost:8080";
-  const redirectUri =
-    readServerEnv("GOOGLE_OAUTH_REDIRECT_URI") ??
-    `${appUrl.replace(/\/$/, "")}/api/integrations/google/callback`;
+  const redirectUri = resolveGoogleOAuthRedirectUri(requestUrl, {
+    appUrl: readServerEnv("APP_URL"),
+    explicitRedirectUri: readServerEnv("GOOGLE_OAUTH_REDIRECT_URI"),
+  });
 
   const horizonRaw = readServerEnv("GOOGLE_CALENDAR_SYNC_HORIZON_DAYS");
   const syncHorizonDays = horizonRaw ? Math.max(1, Number.parseInt(horizonRaw, 10) || 30) : 30;
@@ -38,4 +42,17 @@ export function getGoogleOAuthConfig(): GoogleOAuthConfig | null {
 
 export function isGoogleCalendarConfigured(): boolean {
   return getGoogleOAuthConfig() !== null;
+}
+
+export function getGoogleOAuthAppBase(requestUrl?: string): string {
+  const config = getGoogleOAuthConfig(requestUrl);
+  if (config) {
+    return resolveAppBaseFromRedirectUri(config.redirectUri);
+  }
+
+  const redirectUri = resolveGoogleOAuthRedirectUri(requestUrl, {
+    appUrl: readServerEnv("APP_URL"),
+    explicitRedirectUri: readServerEnv("GOOGLE_OAUTH_REDIRECT_URI"),
+  });
+  return resolveAppBaseFromRedirectUri(redirectUri);
 }

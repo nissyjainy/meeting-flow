@@ -11,14 +11,14 @@ import {
   redirectResponse,
   settingsRedirectUrl,
 } from "@/lib/integrations/google/settings-redirect";
-import { readServerEnv } from "@/lib/server-env";
+import { getGoogleOAuthAppBase } from "@/lib/integrations/google/env";
 
 export const Route = createFileRoute("/api/integrations/google/connect")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const config = getGoogleOAuthConfig();
-        const appBase = readServerEnv("APP_URL") ?? "http://localhost:8080";
+        const appBase = getGoogleOAuthAppBase(request.url);
+        const config = getGoogleOAuthConfig(request.url);
 
         if (!config) {
           return redirectResponse(settingsRedirectUrl(appBase, { error: "not_configured" }));

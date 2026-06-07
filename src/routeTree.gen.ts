@@ -26,6 +26,7 @@ import { Route as AppAssistantRouteImport } from './routes/_app.assistant'
 import { Route as AppAnalyticsRouteImport } from './routes/_app.analytics'
 import { Route as AppMeetingsIndexRouteImport } from './routes/_app.meetings.index'
 import { Route as ApiHealthSupabaseRouteImport } from './routes/api.health.supabase'
+import { Route as ApiHealthGoogleOauthRouteImport } from './routes/api.health.google-oauth'
 import { Route as ApiCronTaskRemindersRouteImport } from './routes/api.cron.task-reminders'
 import { Route as AppMeetingsIdRouteImport } from './routes/_app.meetings.$id'
 import { Route as ApiIntegrationsGoogleDisconnectRouteImport } from './routes/api.integrations.google.disconnect'
@@ -117,6 +118,11 @@ const ApiHealthSupabaseRoute = ApiHealthSupabaseRouteImport.update({
   path: '/api/health/supabase',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiHealthGoogleOauthRoute = ApiHealthGoogleOauthRouteImport.update({
+  id: '/api/health/google-oauth',
+  path: '/api/health/google-oauth',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiCronTaskRemindersRoute = ApiCronTaskRemindersRouteImport.update({
   id: '/api/cron/task-reminders',
   path: '/api/cron/task-reminders',
@@ -168,6 +174,7 @@ export interface FileRoutesByFullPath {
   '/auth/callback': typeof AuthCallbackRoute
   '/meetings/$id': typeof AppMeetingsIdRoute
   '/api/cron/task-reminders': typeof ApiCronTaskRemindersRoute
+  '/api/health/google-oauth': typeof ApiHealthGoogleOauthRoute
   '/api/health/supabase': typeof ApiHealthSupabaseRoute
   '/meetings/': typeof AppMeetingsIndexRoute
   '/meetings/scheduled/$id': typeof AppMeetingsScheduledIdRoute
@@ -191,6 +198,7 @@ export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
   '/meetings/$id': typeof AppMeetingsIdRoute
   '/api/cron/task-reminders': typeof ApiCronTaskRemindersRoute
+  '/api/health/google-oauth': typeof ApiHealthGoogleOauthRoute
   '/api/health/supabase': typeof ApiHealthSupabaseRoute
   '/meetings': typeof AppMeetingsIndexRoute
   '/meetings/scheduled/$id': typeof AppMeetingsScheduledIdRoute
@@ -217,6 +225,7 @@ export interface FileRoutesById {
   '/_app/': typeof AppIndexRoute
   '/_app/meetings/$id': typeof AppMeetingsIdRoute
   '/api/cron/task-reminders': typeof ApiCronTaskRemindersRoute
+  '/api/health/google-oauth': typeof ApiHealthGoogleOauthRoute
   '/api/health/supabase': typeof ApiHealthSupabaseRoute
   '/_app/meetings/': typeof AppMeetingsIndexRoute
   '/_app/meetings/scheduled/$id': typeof AppMeetingsScheduledIdRoute
@@ -243,6 +252,7 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/meetings/$id'
     | '/api/cron/task-reminders'
+    | '/api/health/google-oauth'
     | '/api/health/supabase'
     | '/meetings/'
     | '/meetings/scheduled/$id'
@@ -266,6 +276,7 @@ export interface FileRouteTypes {
     | '/'
     | '/meetings/$id'
     | '/api/cron/task-reminders'
+    | '/api/health/google-oauth'
     | '/api/health/supabase'
     | '/meetings'
     | '/meetings/scheduled/$id'
@@ -291,6 +302,7 @@ export interface FileRouteTypes {
     | '/_app/'
     | '/_app/meetings/$id'
     | '/api/cron/task-reminders'
+    | '/api/health/google-oauth'
     | '/api/health/supabase'
     | '/_app/meetings/'
     | '/_app/meetings/scheduled/$id'
@@ -306,6 +318,7 @@ export interface RootRouteChildren {
   SignupRoute: typeof SignupRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   ApiCronTaskRemindersRoute: typeof ApiCronTaskRemindersRoute
+  ApiHealthGoogleOauthRoute: typeof ApiHealthGoogleOauthRoute
   ApiHealthSupabaseRoute: typeof ApiHealthSupabaseRoute
   ApiIntegrationsGoogleCallbackRoute: typeof ApiIntegrationsGoogleCallbackRoute
   ApiIntegrationsGoogleConnectRoute: typeof ApiIntegrationsGoogleConnectRoute
@@ -433,6 +446,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHealthSupabaseRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/health/google-oauth': {
+      id: '/api/health/google-oauth'
+      path: '/api/health/google-oauth'
+      fullPath: '/api/health/google-oauth'
+      preLoaderRoute: typeof ApiHealthGoogleOauthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/cron/task-reminders': {
       id: '/api/cron/task-reminders'
       path: '/api/cron/task-reminders'
@@ -529,6 +549,7 @@ const rootRouteChildren: RootRouteChildren = {
   SignupRoute: SignupRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   ApiCronTaskRemindersRoute: ApiCronTaskRemindersRoute,
+  ApiHealthGoogleOauthRoute: ApiHealthGoogleOauthRoute,
   ApiHealthSupabaseRoute: ApiHealthSupabaseRoute,
   ApiIntegrationsGoogleCallbackRoute: ApiIntegrationsGoogleCallbackRoute,
   ApiIntegrationsGoogleConnectRoute: ApiIntegrationsGoogleConnectRoute,

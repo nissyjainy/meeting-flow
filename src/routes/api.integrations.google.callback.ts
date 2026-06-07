@@ -4,7 +4,7 @@ import {
   exchangeGoogleAuthCode,
   fetchGoogleAccountEmail,
 } from "@/lib/integrations/google/oauth";
-import { getGoogleOAuthConfig } from "@/lib/integrations/google/env";
+import { getGoogleOAuthAppBase, getGoogleOAuthConfig } from "@/lib/integrations/google/env";
 import { googleOAuthDebug } from "@/lib/integrations/google/oauth-debug";
 import {
   clearOAuthStateCookie,
@@ -27,8 +27,8 @@ export const Route = createFileRoute("/api/integrations/google/callback")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const config = getGoogleOAuthConfig();
-        const appBase = (config?.redirectUri ?? "http://localhost:8080").replace(/\/api\/.*$/, "");
+        const appBase = getGoogleOAuthAppBase(request.url);
+        const config = getGoogleOAuthConfig(request.url);
 
         if (!config) {
           return redirectResponse(settingsRedirectUrl(appBase, { error: "not_configured" }));
