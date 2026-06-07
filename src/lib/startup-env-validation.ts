@@ -1,4 +1,5 @@
 import { readServerEnv } from "@/lib/server-env";
+import { extractSupabaseProjectRef } from "@/lib/supabase/project-ref";
 
 type EnvRequirement = {
   key: string;
@@ -67,6 +68,12 @@ export function validateServerStartupEnv(context = "server"): void {
     logMissingVars(context, missing);
     return;
   }
+
+  const supabaseUrl = readServerEnv("VITE_SUPABASE_URL") ?? readClientEnv("VITE_SUPABASE_URL");
+  const projectRef = extractSupabaseProjectRef(supabaseUrl);
+  console.info(
+    `[startup-env] ${context}: Supabase project ${projectRef ?? "(unknown)"} (${supabaseUrl ?? "no URL resolved"})`,
+  );
 
   logAllPresent(context);
 }

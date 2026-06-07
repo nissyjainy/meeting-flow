@@ -1,4 +1,5 @@
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { wrapSupabaseError } from "@/lib/supabase/errors";
 import { fetchGoogleCalendarMeetEvents } from "./calendar-client";
 import { getGoogleOAuthConfig } from "./env";
 import { refreshGoogleAccessToken, tokenExpiresAt } from "./oauth";
@@ -9,8 +10,9 @@ import type {
 } from "./types";
 import { GOOGLE_INTEGRATION_SCOPES } from "./scopes";
 
-const CALENDAR_EVENT_COLUMNS =
-  "id,user_id,google_event_id,google_calendar_id,title,organizer_email,organizer_name,starts_at,ends_at,attendees,meet_link,platform,meeting_url,meeting_code,google_conference_id,capture_status,transcript_status,status,linked_meeting_id,synced_at,created_at,updated_at";
+function throwSyncError(error: { message: string }): never {
+  throw wrapSupabaseError(error, "sync calendar_events");
+}
 
 export async function loadGoogleCalendarConnection(
   userId: string,
@@ -109,7 +111,7 @@ async function upsertCalendarEvents(
       .maybeSingle();
 
     if (existingError) {
-      throw new Error(existingError.message);
+      throwSyncError(existingError);
     }
 
     const row = {
@@ -127,18 +129,19 @@ async function upsertCalendarEvents(
       meeting_url: event.meetingUrl,
       meeting_code: event.meetingCode,
       google_conference_id: event.googleConferenceId,
-      capture_status: "discovered",
       status: event.cancelled ? "cancelled" : "scheduled",
       synced_at: nowIso,
     };
 
     if (existing?.id) {
       const { error } = await admin.from("calendar_events").update(row).eq("id", existing.id);
-      if (error) throw new Error(error.message);
+      if (error) throwSyncError(error);
       updatedCount += 1;
     } else {
-      const { error } = await admin.from("calendar_events").insert(row);
-      if (error) throw new Error(error.message);
+      const { error } = await admin
+        .from("calendar_events")
+        .insert({ ...row, capture_status: "discovered" });
+      if (error) throwSyncError(error);
       importedCount += 1;
     }
   }
@@ -160,7 +163,7 @@ async function upsertCalendarEvents(
     .lte("starts_at", timeMax);
 
   if (storedError) {
-    throw new Error(storedError.message);
+    throwSyncError(storedError);
   }
 
   let cancelledCount = 0;
@@ -172,7 +175,7 @@ async function upsertCalendarEvents(
       .update({ status: "cancelled", synced_at: nowIso })
       .eq("id", stored.id);
 
-    if (error) throw new Error(error.message);
+    if (error) throwSyncError(error);
     cancelledCount += 1;
   }
 
@@ -292,4 +295,3 @@ export async function deleteGoogleCalendarConnection(userId: string): Promise<vo
   }
 }
 
-export { CALENDAR_EVENT_COLUMNS };

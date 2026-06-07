@@ -1,6 +1,7 @@
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getCalendarMeetingLifecycle } from "@/lib/calendar/meeting-lifecycle";
 import { CALENDAR_EVENT_COLUMNS, mapCalendarEventRow } from "@/lib/calendar/api";
+import { wrapSupabaseError } from "@/lib/supabase/errors";
 import { assembleMeetTranscriptText } from "./assemble-meet-transcript";
 import { isGoogleCalendarConfigured } from "./env";
 import {
@@ -59,7 +60,7 @@ export async function fetchMeetTranscriptForCalendarEvent(
     .maybeSingle();
 
   if (eventError) {
-    return failure("error", eventError.message);
+    return failure("error", wrapSupabaseError(eventError, "select calendar_events for transcript").message);
   }
 
   const event = eventRow

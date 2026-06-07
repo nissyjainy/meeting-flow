@@ -1,4 +1,5 @@
-import { createClient } from "@/lib/supabase/client";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { wrapSupabaseError } from "@/lib/supabase/errors";
 import type { CalendarAttendee, CalendarEventRecord } from "./types";
 
 export const CALENDAR_EVENT_COLUMNS =
@@ -84,29 +85,32 @@ export function mapCalendarEventRow(row: Record<string, unknown>): CalendarEvent
   };
 }
 
-export async function listCalendarEvents(): Promise<CalendarEventRecord[]> {
-  const supabase = createClient();
+export async function queryCalendarEvents(
+  supabase: SupabaseClient,
+): Promise<CalendarEventRecord[]> {
   const { data, error } = await supabase
     .from("calendar_events")
     .select(CALENDAR_EVENT_COLUMNS)
     .order("starts_at", { ascending: true });
 
-  if (error) throw new Error(error.message);
+  if (error) throw wrapSupabaseError(error, "select calendar_events");
 
   return (data ?? [])
     .map((row) => mapCalendarEventRow(row as Record<string, unknown>))
     .filter((row): row is CalendarEventRecord => row !== null);
 }
 
-export async function getCalendarEvent(id: string): Promise<CalendarEventRecord | null> {
-  const supabase = createClient();
+export async function queryCalendarEventById(
+  supabase: SupabaseClient,
+  id: string,
+): Promise<CalendarEventRecord | null> {
   const { data, error } = await supabase
     .from("calendar_events")
     .select(CALENDAR_EVENT_COLUMNS)
     .eq("id", id)
     .maybeSingle();
 
-  if (error) throw new Error(error.message);
+  if (error) throw wrapSupabaseError(error, "select calendar_events by id");
   if (!data) return null;
 
   return mapCalendarEventRow(data as Record<string, unknown>);
