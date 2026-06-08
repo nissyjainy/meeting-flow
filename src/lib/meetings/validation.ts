@@ -36,7 +36,7 @@ export function validateMeetingFile(file: File): FileValidationResult {
   if (file.type && !ALLOWED_MIME_TYPES.has(file.type)) {
     return {
       valid: false,
-      message: `Unsupported MIME type (${file.type}). Use mp3, mp4, wav, or m4a.`,
+      message: `Unsupported MIME type (${file.type}). Use mp3, mp4, wav, m4a, or webm.`,
     };
   }
 
@@ -50,6 +50,7 @@ export function mimeTypeFromFileName(fileName: string): string {
     ".mp4": "video/mp4",
     ".wav": "audio/wav",
     ".m4a": "audio/m4a",
+    ".webm": "audio/webm",
   };
   return map[ext] ?? "application/octet-stream";
 }

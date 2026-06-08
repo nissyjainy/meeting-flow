@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MeetFlow Capture</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+        font-size: 13px;
+      }
+      body {
+        margin: 0;
+        width: 320px;
+        padding: 14px;
+        background: #0f1115;
+        color: #e8eaed;
+      }
+      h1 {
+        margin: 0 0 4px;
+        font-size: 15px;
+      }
+      .sub {
+        margin: 0 0 12px;
+        color: #9aa0a6;
+        font-size: 12px;
+        line-height: 1.4;
+      }
+      .card {
+        background: #1a1d23;
+        border: 1px solid #2d3139;
+        border-radius: 10px;
+        padding: 10px;
+        margin-bottom: 10px;
+      }
+      label {
+        display: block;
+        margin-bottom: 4px;
+        color: #bdc1c6;
+        font-size: 11px;
+      }
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        margin-bottom: 8px;
+        padding: 7px 8px;
+        border-radius: 8px;
+        border: 1px solid #3c4043;
+        background: #0f1115;
+        color: #e8eaed;
+      }
+      button {
+        width: 100%;
+        border: none;
+        border-radius: 8px;
+        padding: 9px 10px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .primary {
+        background: #1a73e8;
+        color: white;
+      }
+      .danger {
+        background: #d93025;
+        color: white;
+      }
+      .ghost {
+        background: transparent;
+        color: #8ab4f8;
+        border: 1px solid #3c4043;
+        margin-top: 6px;
+      }
+      .status {
+        font-size: 12px;
+        line-height: 1.45;
+        color: #bdc1c6;
+      }
+      .status strong {
+        color: #e8eaed;
+      }
+      .meet-ok {
+        color: #81c995;
+      }
+      .meet-bad {
+        color: #f28b82;
+      }
+      .progress {
+        height: 6px;
+        background: #2d3139;
+        border-radius: 999px;
+        overflow: hidden;
+        margin: 8px 0;
+      }
+      .progress > span {
+        display: block;
+        height: 100%;
+        width: 0%;
+        background: #1a73e8;
+        transition: width 0.2s ease;
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .hidden {
+        display: none;
+      }
+      .recordings {
+        max-height: 120px;
+        overflow: auto;
+        font-size: 11px;
+      }
+      .recordings li {
+        margin-bottom: 6px;
+      }
+      .hint {
+        margin-top: 8px;
+        font-size: 11px;
+        color: #9aa0a6;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>MeetFlow Capture</h1>
+    <p class="sub">Record Google Meet tab audio and upload to your MeetFlow account.</p>
+
+    <section id="setup-section" class="card hidden">
+      <label for="meetflow-url">MeetFlow URL</label>
+      <input id="meetflow-url" type="url" placeholder="https://meeting-flow.nisargjain.workers.dev" />
+
+      <label for="supabase-url">Supabase URL</label>
+      <input id="supabase-url" type="url" placeholder="https://your-project.supabase.co" />
+
+      <label for="supabase-key">Supabase publishable key</label>
+      <input id="supabase-key" type="password" placeholder="sb_publishable_… or anon key" />
+
+      <button id="save-config-btn" class="primary" type="button">Save settings</button>
+    </section>
+
+    <section id="auth-section" class="card hidden">
+      <label for="email">MeetFlow email</label>
+      <input id="email" type="email" autocomplete="username" />
+
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" />
+
+      <button id="sign-in-btn" class="primary" type="button">Sign in</button>
+      <button id="sign-out-btn" class="ghost" type="button">Sign out</button>
+    </section>
+
+    <section id="capture-section" class="card hidden">
+      <p id="meet-status" class="status">Checking active tab…</p>
+      <p id="capture-status" class="status"></p>
+      <div class="progress"><span id="progress-bar"></span></div>
+      <div class="row">
+        <button id="start-btn" class="primary" type="button">Start Capture</button>
+        <button id="stop-btn" class="danger" type="button" disabled>Stop Capture</button>
+      </div>
+      <p class="hint">Keep this popup open while recording. Pin the extension for easier access.</p>
+    </section>
+
+    <section id="recordings-section" class="card hidden">
+      <p class="status"><strong>Recent captures</strong></p>
+      <ul id="recordings-list" class="recordings"></ul>
+    </section>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

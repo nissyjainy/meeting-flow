@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "MeetFlow Meet Capture",
+  "version": "0.1.0",
+  "description": "Capture Google Meet tab audio and upload to MeetFlow for transcription.",
+  "permissions": ["tabCapture", "storage", "tabs", "activeTab"],
+  "host_permissions": [
+    "https://meet.google.com/*",
+    "https://*.supabase.co/*",
+    "https://meeting-flow.nisargjain.workers.dev/*",
+    "http://localhost:8080/*",
+    "http://127.0.0.1:8080/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "MeetFlow Meet Capture"
+  }
+}
