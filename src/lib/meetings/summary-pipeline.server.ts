@@ -84,15 +84,16 @@ async function markPipelineComplete(
   summaryLog("final status update success (completed)", { meetingId, row: statusRow });
 }
 
-export async function runMeetingSummaryPipeline(meetingId: string): Promise<{
+export async function runMeetingSummaryPipeline(
+  meetingId: string,
+  supabase: SupabaseClient = getSupabaseServerClient(),
+): Promise<{
   success: boolean;
   summary?: string;
   error?: string;
   taskOutcome?: Awaited<ReturnType<typeof runMeetingTaskExtractionPipeline>>;
 }> {
   summaryLog("summary started (pipeline)", { meetingId });
-
-  const supabase = getSupabaseServerClient();
 
   try {
     const { data: meeting, error: meetingError } = await supabase

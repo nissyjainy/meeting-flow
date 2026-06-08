@@ -9,6 +9,7 @@ import "./lib/error-capture";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import { bindWorkerEnv } from "./lib/server-env";
+import { bindWorkerExecutionContext } from "./lib/worker/background-task";
 import { validateServerStartupEnv } from "./lib/startup-env-validation";
 import { getReminderConfig } from "./lib/reminders/reminder-env";
 import { logReminderEnvStatus } from "./lib/reminders/reminder-env";
@@ -104,6 +105,7 @@ export default {
     try {
       console.log("[worker-env-keys]", Object.keys(env || {}));
       bindWorkerEnv(env);
+      bindWorkerExecutionContext(ctx);
       if (!envLogged) {
         envLogged = true;
         console.log("[app-boot] fetch handler ready — runtime: server");

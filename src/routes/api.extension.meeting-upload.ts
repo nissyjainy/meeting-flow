@@ -3,6 +3,7 @@ import { uploadCapturedMeetingRecording } from "@/lib/meetings/capture-upload.se
 import { normalizeUploadFile } from "@/lib/meetings/normalize-upload-file";
 import { runMeetingAiPipeline } from "@/lib/meetings/run-meeting-ai-pipeline.server";
 import { createSupabaseBearerClient, parseBearerToken } from "@/lib/supabase/bearer-client";
+import { scheduleBackgroundTask } from "@/lib/worker/background-task";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -78,9 +79,10 @@ export const Route = createFileRoute("/api/extension/meeting-upload")({
             },
           });
 
-          void runMeetingAiPipeline(result.meeting.id).catch((error) => {
-            console.error("[extension-upload] background AI pipeline failed", error);
-          });
+          const meetingId = result.meeting.id;
+          await scheduleBackgroundTask(`meeting-ai-pipeline:${meetingId}`, () =>
+            runMeetingAiPipeline(meetingId),
+          );
 
           const origin = new URL(request.url).origin;
 

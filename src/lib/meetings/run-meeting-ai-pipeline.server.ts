@@ -1,4 +1,5 @@
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { markTranscriptionFailed } from "./mark-transcription-failed.server";
 import { runMeetingSummaryPipeline } from "./summary-pipeline.server";
 import { runTranscribeMeeting } from "./transcription";
 import { uploadDebug, uploadDebugError } from "./upload-debug";
@@ -21,12 +22,26 @@ export async function runMeetingAiPipeline(meetingId: string): Promise<void> {
     await runTranscribeMeeting(meetingId, admin);
     uploadDebug("runMeetingAiPipeline transcription done", { meetingId });
   } catch (error) {
+    const message = error instanceof Error ? error.message : "Transcription failed";
     uploadDebugError("runMeetingAiPipeline transcription failed", error, { meetingId });
+    try {
+      await markTranscriptionFailed(admin, meetingId, message);
+    } catch (markErr) {
+      uploadDebugError("runMeetingAiPipeline markTranscriptionFailed threw", markErr, { meetingId });
+    }
     return;
   }
 
   try {
-    await runMeetingSummaryPipeline(meetingId);
+    const summaryOutcome = await runMeetingSummaryPipeline(meetingId, admin);
+    if (!summaryOutcome.success) {
+      uploadDebugError(
+        "runMeetingAiPipeline summary failed",
+        new Error(summaryOutcome.error ?? "Summary failed"),
+        { meetingId },
+      );
+      return;
+    }
     uploadDebug("runMeetingAiPipeline summary done", { meetingId });
   } catch (error) {
     uploadDebugError("runMeetingAiPipeline summary failed", error, { meetingId });
