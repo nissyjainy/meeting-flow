@@ -8,6 +8,8 @@ Open the [SQL Editor](https://supabase.com/dashboard/project/uzddznccxnolcarxykb
 
 Then run `migrations/20260520300000_meetings_summary.sql` and `migrations/20260520310000_fix_summary_status.sql` for AI summary + `status` column.
 
+Then run `migrations/20260521000000_meeting_transcript_error.sql` for transcription failure messages (`transcript_error` column). Upload inserts select this column; without it PostgREST returns **"column meetings.transcript_error does not exist"**.
+
 Then run `migrations/20260520400000_meeting_tasks.sql` and `migrations/20260520410000_tasks_schema_align.sql` for extracted action items (`tasks` table).
 
 Then run `migrations/20260520500000_team_members.sql` for per-meeting attendee name/email mapping (`team_members` table).
@@ -16,7 +18,7 @@ Then run `migrations/20260520600000_task_status.sql` for task status updates (`p
 
 Then run `migrations/20260520700000_reminder_sends.sql` for dashboard reminder analytics (`reminder_sends` table).
 
-Table columns: `id`, `file_name`, `file_url`, `transcript`, `summary`, `status`, `created_at`.
+Table columns: `id`, `file_name`, `file_url`, `transcript`, `summary`, `status`, `transcript_error`, `created_at`.
 
 `tasks` table: `meeting_id`, `task`, `owner`, `deadline`, `status` (default `pending`; values: `pending`, `in_progress`, `completed`), `created_at`. Legacy `open` is backfilled to `pending`. Overdue is derived at read/reminder time, not stored.
 
