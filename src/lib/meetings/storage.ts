@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { MEETINGS_BUCKET } from "./constants";
 import { uploadDebug, uploadDebugError, uploadDebugReturn } from "./upload-debug";
-import { mimeTypeFromFileName, sanitizeStorageFileName } from "./validation";
+import { mimeTypeFromFileName, normalizeMeetingMimeType, sanitizeStorageFileName } from "./validation";
 
 export function buildMeetingStoragePath(
   userId: string,
@@ -66,7 +66,7 @@ export async function uploadMeetingFile({
     onProgress?.(0);
 
     const { error } = await supabase.storage.from(MEETINGS_BUCKET).upload(path, file, {
-      contentType: file.type || mimeTypeFromFileName(file.name),
+      contentType: normalizeMeetingMimeType(file.type, file.name),
       upsert: false,
     });
 

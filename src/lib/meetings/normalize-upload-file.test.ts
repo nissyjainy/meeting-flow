@@ -15,6 +15,12 @@ describe("normalizeUploadFile", () => {
     expect(file?.size).toBeGreaterThan(0);
   });
 
+  it("normalizes codec-parameter MIME types on wrap", () => {
+    const blob = new Blob(["audio"], { type: "audio/webm;codecs=opus" });
+    const file = normalizeUploadFile(blob, "meet-capture.webm");
+    expect(file?.type).toBe("audio/webm");
+  });
+
   it("keeps file with name", () => {
     const file = new File(["audio"], "recording.webm", { type: "audio/webm" });
     const normalized = normalizeUploadFile(file, "fallback.webm");

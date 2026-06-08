@@ -4,7 +4,7 @@ import { enrichMeetingRecord } from "./record";
 import type { MeetingRecord } from "./types";
 import { buildMeetingStoragePath } from "./storage";
 import { uploadDebug, uploadDebugError } from "./upload-debug";
-import { mimeTypeFromFileName, validateMeetingFile } from "./validation";
+import { normalizeMeetingMimeType, validateMeetingFile } from "./validation";
 
 export type CaptureUploadMetadata = {
   meetUrl?: string | null;
@@ -50,7 +50,7 @@ export async function uploadCapturedMeetingRecording(
   const storagePath = buildMeetingStoragePath(userId, meetingId, file.name);
 
   const { error: storageError } = await supabase.storage.from(MEETINGS_BUCKET).upload(storagePath, file, {
-    contentType: file.type || mimeTypeFromFileName(file.name),
+    contentType: normalizeMeetingMimeType(file.type, file.name),
     upsert: false,
   });
 

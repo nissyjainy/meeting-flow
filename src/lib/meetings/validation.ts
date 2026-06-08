@@ -13,6 +13,29 @@ function getExtension(fileName: string): string {
   return dot >= 0 ? fileName.slice(dot).toLowerCase() : "";
 }
 
+/** Strip MIME parameters (e.g. `audio/webm;codecs=opus` → `audio/webm`). */
+export function baseMeetingMimeType(mimeType: string): string {
+  return mimeType.split(";")[0]?.trim().toLowerCase() ?? "";
+}
+
+export function isAllowedMeetingMimeType(mimeType: string): boolean {
+  const base = baseMeetingMimeType(mimeType);
+  if (!base) return true;
+  return ALLOWED_MIME_TYPES.has(base);
+}
+
+/** Normalize for storage/API: base allowed type, else infer from filename. */
+export function normalizeMeetingMimeType(mimeType: string, fileName?: string): string {
+  const base = baseMeetingMimeType(mimeType);
+  if (base && ALLOWED_MIME_TYPES.has(base)) {
+    return base;
+  }
+  if (fileName?.trim()) {
+    return mimeTypeFromFileName(fileName);
+  }
+  return base || "application/octet-stream";
+}
+
 export function validateMeetingFile(file: File): FileValidationResult {
   if (!file || file.size === 0) {
     return { valid: false, message: "File is empty." };
@@ -33,7 +56,7 @@ export function validateMeetingFile(file: File): FileValidationResult {
     };
   }
 
-  if (file.type && !ALLOWED_MIME_TYPES.has(file.type)) {
+  if (file.type && !isAllowedMeetingMimeType(file.type)) {
     return {
       valid: false,
       message: `Unsupported MIME type (${file.type}). Use mp3, mp4, wav, m4a, or webm.`,

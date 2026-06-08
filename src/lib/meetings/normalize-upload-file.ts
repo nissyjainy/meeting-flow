@@ -1,3 +1,5 @@
+import { normalizeMeetingMimeType } from "./validation";
+
 /** Normalize multipart uploads from browsers and Cloudflare Workers (File or Blob). */
 export function normalizeUploadFile(
   entry: FormDataEntryValue | null,
@@ -11,6 +13,6 @@ export function normalizeUploadFile(
     return entry;
   }
 
-  const type = entry.type || "audio/webm";
+  const type = normalizeMeetingMimeType(entry.type, fallbackName);
   return new File([entry], fallbackName, { type });
 }
