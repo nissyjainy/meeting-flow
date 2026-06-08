@@ -190,8 +190,6 @@ async function beginRecording(message) {
     audioTrackCount: recordingStream.getAudioTracks().length,
     videoTrackCount: recordingStream.getVideoTracks().length,
   });
-
-  await chrome.storage.local.set({ captureState: { recording: true, startedAt: new Date().toISOString() } });
 }
 
 async function endRecording() {
@@ -230,7 +228,6 @@ async function endRecording() {
   const meetUrl = meetMeta?.meetUrl ?? null;
   const meetTitle = meetMeta?.meetTitle ?? null;
   cleanup();
-  await chrome.storage.local.set({ captureState: { recording: false } });
 
   if (blob.size < MIN_RECORDING_BYTES) {
     const error = `Recording too small (${blob.size} bytes). Stay in the Meet call and record at least 10 seconds.`;
@@ -262,7 +259,31 @@ async function endRecording() {
   }
 }
 
+function getRecorderStatus() {
+  const active = Boolean(mediaRecorder && mediaRecorder.state === "recording");
+  return {
+    ok: true,
+    active,
+    recorderState: mediaRecorder?.state ?? "none",
+  };
+}
+
+function forceReset() {
+  cleanup();
+  return { ok: true, active: false, recorderState: "none" };
+}
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.type === "GET_RECORDER_STATUS") {
+    sendResponse(getRecorderStatus());
+    return;
+  }
+
+  if (message?.type === "FORCE_RESET") {
+    sendResponse(forceReset());
+    return;
+  }
+
   if (message?.type === "BEGIN_RECORDING") {
     void beginRecording(message)
       .then(() => sendResponse({ ok: true }))

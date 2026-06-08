@@ -7,13 +7,15 @@ const DEFAULT_CONFIG = {
   supabaseKey: "",
 };
 
-/** @type {{ recording: boolean; tabId: number | null; meetUrl: string | null; startedAt: string | null }} */
-let captureState = {
+const IDLE_CAPTURE_STATE = {
   recording: false,
   tabId: null,
   meetUrl: null,
   startedAt: null,
 };
+
+/** @type {{ recording: boolean; tabId: number | null; meetUrl: string | null; startedAt: string | null }} */
+let captureState = { ...IDLE_CAPTURE_STATE };
 
 function log(step, detail) {
   console.info(`${LOG_PREFIX} ${step}`, detail ?? "");
@@ -183,6 +185,77 @@ async function syncCaptureState(next) {
   await chrome.storage.local.set({ captureState });
 }
 
+async function clearCaptureState(statusMessage) {
+  captureState = { ...IDLE_CAPTURE_STATE };
+  await chrome.storage.local.set({ captureState });
+  if (statusMessage) {
+    await setLastCaptureStatus(statusMessage);
+  }
+}
+
+async function getOffscreenRecorderStatus() {
+  const contexts = await chrome.runtime.getContexts({
+    contextTypes: ["OFFSCREEN_DOCUMENT"],
+    documentUrls: [chrome.runtime.getURL("offscreen.html")],
+  });
+  if (contexts.length === 0) {
+    return { active: false, recorderState: "none", offscreenPresent: false };
+  }
+
+  try {
+    const response = await chrome.runtime.sendMessage({ type: "GET_RECORDER_STATUS" });
+    return {
+      active: Boolean(response?.active),
+      recorderState: response?.recorderState ?? "unknown",
+      offscreenPresent: true,
+    };
+  } catch (error) {
+    logError("getOffscreenRecorderStatus failed", error);
+    return { active: false, recorderState: "unreachable", offscreenPresent: true };
+  }
+}
+
+async function reconcileCaptureState({ forceClear = false } = {}) {
+  if (forceClear) {
+    try {
+      await sendToOffscreen({ type: "FORCE_RESET" });
+    } catch {
+      // Offscreen may not exist after reload.
+    }
+    await clearCaptureState("Extension state reset.");
+    return { captureState, recorderActive: false, staleCleared: true };
+  }
+
+  const stored = await chrome.storage.local.get(["captureState"]);
+  if (stored.captureState) {
+    captureState = { ...captureState, ...stored.captureState };
+  }
+
+  const thinksRecording = Boolean(captureState.recording);
+  const recorderStatus = await getOffscreenRecorderStatus();
+  const recorderActive = recorderStatus.active;
+
+  if (thinksRecording && !recorderActive) {
+    log("clearing stale recording state", { captureState, recorderStatus });
+    await clearCaptureState("Previous recording session ended. Ready to capture.");
+    return { captureState, recorderActive: false, staleCleared: true };
+  }
+
+  if (recorderActive && !thinksRecording) {
+    await syncCaptureState({ recording: true });
+  }
+
+  return { captureState, recorderActive: recorderActive, staleCleared: thinksRecording && !recorderActive };
+}
+
+async function initializeExtensionState() {
+  const stored = await chrome.storage.local.get(["captureState"]);
+  if (stored.captureState) {
+    captureState = { ...IDLE_CAPTURE_STATE, ...stored.captureState };
+  }
+  await reconcileCaptureState();
+}
+
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.url || changeInfo.status === "complete") {
     void setBadgeForTab(tab);
@@ -194,17 +267,41 @@ chrome.tabs.onActivated.addListener(async ({ tabId }) => {
   await setBadgeForTab(tab);
 });
 
-chrome.runtime.onInstalled.addListener(async () => {
-  const stored = await chrome.storage.local.get(["captureState"]);
-  if (stored.captureState) {
-    captureState = stored.captureState;
-  }
+chrome.runtime.onInstalled.addListener(() => {
+  void initializeExtensionState();
 });
+
+chrome.runtime.onStartup.addListener(() => {
+  void initializeExtensionState();
+});
+
+void initializeExtensionState();
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === "GET_CAPTURE_STATE") {
-    sendResponse({ ok: true, captureState });
-    return;
+    void (async () => {
+      const result = await reconcileCaptureState();
+      sendResponse({
+        ok: true,
+        captureState: result.captureState,
+        recorderActive: result.recorderActive,
+        staleCleared: result.staleCleared,
+      });
+    })();
+    return true;
+  }
+
+  if (message?.type === "RESET_EXTENSION_STATE") {
+    void (async () => {
+      try {
+        const result = await reconcileCaptureState({ forceClear: true });
+        sendResponse({ ok: true, ...result });
+      } catch (error) {
+        logError("RESET_EXTENSION_STATE failed", error);
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      }
+    })();
+    return true;
   }
 
   if (message?.type === "GET_ACTIVE_MEET_TAB") {
@@ -226,13 +323,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === "START_OFFSCREEN_RECORDING") {
     void (async () => {
       try {
-        await syncCaptureState({
-          recording: true,
-          tabId: message.tabId ?? null,
-          meetUrl: message.meetUrl ?? null,
-          startedAt: new Date().toISOString(),
-        });
-        await setLastCaptureStatus("Recording…");
+        const current = await reconcileCaptureState();
+        if (current.recorderActive) {
+          sendResponse({ ok: false, error: "Recording already in progress." });
+          return;
+        }
+
         const result = await sendToOffscreen({
           type: "BEGIN_RECORDING",
           streamId: message.streamId,
@@ -241,9 +337,24 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           meetCode: message.meetCode,
           title: message.title,
         });
+
+        if (!result?.ok) {
+          await clearCaptureState(result?.error || "Could not start recording.");
+          sendResponse(result);
+          return;
+        }
+
+        await syncCaptureState({
+          recording: true,
+          tabId: message.tabId ?? null,
+          meetUrl: message.meetUrl ?? null,
+          startedAt: new Date().toISOString(),
+        });
+        await setLastCaptureStatus("Recording… You can close this popup.");
         sendResponse(result);
       } catch (error) {
         logError("START_OFFSCREEN_RECORDING failed", error);
+        await clearCaptureState(error instanceof Error ? error.message : "Could not start recording.");
         sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) });
       }
     })();
@@ -253,17 +364,20 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === "STOP_OFFSCREEN_RECORDING") {
     void (async () => {
       try {
+        const current = await reconcileCaptureState();
+        if (!current.recorderActive) {
+          await clearCaptureState("No active recording.");
+          sendResponse({ ok: false, error: "No active recording." });
+          return;
+        }
+
         await setLastCaptureStatus("Stopping recording…");
         const result = await sendToOffscreen({ type: "END_RECORDING" });
-        await syncCaptureState({
-          recording: false,
-          tabId: null,
-          meetUrl: null,
-          startedAt: null,
-        });
+        await clearCaptureState(result?.ok ? "Processing upload…" : result?.error || "Could not stop recording.");
         sendResponse(result);
       } catch (error) {
         logError("STOP_OFFSCREEN_RECORDING failed", error);
+        await clearCaptureState(error instanceof Error ? error.message : "Could not stop recording.");
         sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) });
       }
     })();
@@ -272,6 +386,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   if (message?.type === "RECORDING_FAILED") {
     void (async () => {
+      await clearCaptureState(message.error);
       const failedRecord = {
         id: crypto.randomUUID(),
         fileName: message.fileName ?? "meet-capture.webm",
@@ -284,7 +399,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         diagnostics: message.diagnostics ?? null,
       };
       await saveRecordingRecord(failedRecord);
-      await setLastCaptureStatus(message.error);
       sendResponse({ ok: true });
     })();
     return true;

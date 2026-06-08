@@ -14,6 +14,7 @@ const recordingsList = $("recordings-list");
 
 const startBtn = $("start-btn");
 const stopBtn = $("stop-btn");
+const resetStateBtn = $("reset-state-btn");
 
 /** @type {{ tabId: number; meetUrl: string; meetCode: string | null; title: string | null } | null} */
 let activeMeet = null;
@@ -86,11 +87,29 @@ function showSections({ setup, auth, capture, recordings }) {
   recordingsSection.classList.toggle("hidden", !recordings);
 }
 
+async function syncCaptureControls() {
+  const state = await sendMessage({ type: "GET_CAPTURE_STATE" });
+  const recorderActive = Boolean(state?.recorderActive);
+  const onMeet = Boolean(activeMeet?.tabId);
+
+  startBtn.disabled = recorderActive || !onMeet;
+  stopBtn.disabled = !recorderActive;
+
+  if (recorderActive) {
+    setCaptureStatus("Recording… You can close this popup.");
+  } else if (state?.staleCleared) {
+    setCaptureStatus("Previous recording session ended. Ready to capture.");
+  }
+
+  return state;
+}
+
 async function refreshMeetTabStatus() {
   const res = await sendMessage({ type: "GET_ACTIVE_MEET_TAB" });
   if (!res?.ok) {
     meetStatusEl.innerHTML = '<span class="meet-bad">Could not read the active tab.</span>';
     startBtn.disabled = true;
+    stopBtn.disabled = true;
     return;
   }
 
@@ -106,12 +125,12 @@ async function refreshMeetTabStatus() {
   if (res.onMeet) {
     const code = res.meetCode ? ` (${res.meetCode})` : "";
     meetStatusEl.innerHTML = `<span class="meet-ok">Google Meet tab detected${code}</span>`;
-    const state = await sendMessage({ type: "GET_CAPTURE_STATE" });
-    startBtn.disabled = Boolean(state?.captureState?.recording);
+    await syncCaptureControls();
   } else {
     meetStatusEl.innerHTML =
       '<span class="meet-bad">Open a meet.google.com tab and click this extension again.</span>';
     startBtn.disabled = true;
+    stopBtn.disabled = true;
   }
 }
 
@@ -119,7 +138,10 @@ async function refreshRecordings() {
   const res = await sendMessage({ type: "GET_RECORDINGS" });
   const recordings = res?.recordings ?? [];
 
-  if (res?.lastCaptureStatus) {
+  const state = await sendMessage({ type: "GET_CAPTURE_STATE" });
+  if (state?.recorderActive) {
+    setCaptureStatus("Recording… You can close this popup.");
+  } else if (res?.lastCaptureStatus && !state?.staleCleared) {
     setCaptureStatus(res.lastCaptureStatus);
   }
 
@@ -228,9 +250,7 @@ async function startCapture() {
     throw new Error(res?.error || "Could not start recording.");
   }
 
-  startBtn.disabled = true;
-  stopBtn.disabled = false;
-  setCaptureStatus("Recording… You can close this popup.");
+  await syncCaptureControls();
 }
 
 async function stopCapture() {
@@ -300,8 +320,7 @@ startBtn.addEventListener("click", () => {
   void startCapture().catch((error) => {
     logError("startCapture failed", error);
     setCaptureStatus(error instanceof Error ? error.message : "Could not start capture.");
-    startBtn.disabled = false;
-    stopBtn.disabled = true;
+    void syncCaptureControls();
   });
 });
 
@@ -309,8 +328,15 @@ stopBtn.addEventListener("click", () => {
   void stopCapture().catch((error) => {
     logError("stopCapture failed", error);
     setCaptureStatus(error instanceof Error ? error.message : "Could not stop capture.");
-    startBtn.disabled = false;
-    stopBtn.disabled = true;
+    void syncCaptureControls();
+  });
+});
+
+resetStateBtn.addEventListener("click", () => {
+  void resetExtensionState().catch((error) => {
+    logError("resetExtensionState failed", error);
+    setCaptureStatus(error instanceof Error ? error.message : "Could not reset extension state.");
+    void syncCaptureControls();
   });
 });
 
