@@ -1,4 +1,4 @@
-importScripts("storage.js");
+importScripts("storage.js", "upload-bytes.js");
 
 const MEET_HOST = "meet.google.com";
 const LOG_PREFIX = "[meetflow-capture]";
@@ -137,7 +137,11 @@ async function uploadRecordingInBackground({ arrayBuffer, mimeType, fileName, me
   if (meetTitle) formData.append("meetTitle", meetTitle);
 
   const uploadUrl = `${config.meetflowUrl.replace(/\/$/, "")}/api/extension/meeting-upload`;
-  log("background upload POST", { uploadUrl, fileName, bytes: file.size });
+  if (reportedBytes != null && file.size !== reportedBytes) {
+    throw new Error(`Upload file size mismatch (${file.size} vs ${reportedBytes}).`);
+  }
+
+  log("background upload POST", { uploadUrl, fileName, bytes: file.size, headerOk: true });
 
   const res = await fetch(uploadUrl, {
     method: "POST",
@@ -162,14 +166,69 @@ async function uploadRecordingInBackground({ arrayBuffer, mimeType, fileName, me
     uploadedAt: new Date().toISOString(),
     uploadStatus: "success",
     viewUrl: body.viewUrl ?? null,
-    bytes: bytes ?? file.size,
+    bytes: file.size,
     diagnostics: diagnostics ?? null,
   };
 
   await saveRecordingRecord(record);
-  await setLastCaptureStatus(`Upload complete. Meeting ${body.meetingId}`);
-  log("background upload success", { meetingId: body.meetingId });
+  await setLastCaptureStatus(`Upload complete. Meeting ${body.meetingId} (${file.size} bytes)`);
+  log("background upload success", { meetingId: body.meetingId, bytes: file.size });
   return record;
+}
+
+async function getUploadSession() {
+  const { config, session: initialSession } = await getSession();
+  if (!initialSession?.accessToken) {
+    throw new Error("Sign in before uploading.");
+  }
+
+  const session = await refreshAuthToken(config, initialSession);
+  return {
+    accessToken: session.accessToken,
+    uploadUrl: `${config.meetflowUrl.replace(/\/$/, "")}/api/extension/meeting-upload`,
+  };
+}
+
+async function saveUploadSuccessRecord(message) {
+  const record = {
+    id: crypto.randomUUID(),
+    meetingId: message.meetingId,
+    fileName: message.fileName,
+    meetUrl: message.meetUrl ?? null,
+    meetTitle: message.meetTitle ?? null,
+    capturedAt: message.capturedAt ?? new Date().toISOString(),
+    uploadedAt: new Date().toISOString(),
+    uploadStatus: "success",
+    viewUrl: message.viewUrl ?? null,
+    bytes: message.bytes ?? 0,
+    diagnostics: message.diagnostics ?? null,
+  };
+
+  await saveRecordingRecord(record);
+  await setLastCaptureStatus(`Upload complete. Meeting ${message.meetingId} (${message.bytes} bytes)`);
+  if (message.diagnostics) {
+    await extensionStorageSet({ lastRecordingDiagnostics: message.diagnostics }, "background");
+  }
+  return record;
+}
+
+async function saveUploadFailureRecord(message) {
+  const failedRecord = {
+    id: crypto.randomUUID(),
+    fileName: message.fileName,
+    meetUrl: message.meetUrl ?? null,
+    meetTitle: message.meetTitle ?? null,
+    capturedAt: new Date().toISOString(),
+    uploadedAt: new Date().toISOString(),
+    uploadStatus: "failed",
+    error: message.error,
+    bytes: message.bytes ?? 0,
+    diagnostics: message.diagnostics ?? null,
+  };
+
+  await saveRecordingRecord(failedRecord);
+  await setLastCaptureStatus(message.error);
+  return failedRecord;
 }
 
 async function setBadgeForTab(tab) {
@@ -379,7 +438,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
         await setLastCaptureStatus("Stopping recording…");
         const result = await sendToOffscreen({ type: "END_RECORDING" });
-        await clearCaptureState(result?.ok ? "Processing upload…" : result?.error || "Could not stop recording.");
+        if (result?.ok) {
+          await clearCaptureState();
+        } else {
+          await clearCaptureState(result?.error || "Could not stop recording.");
+        }
         sendResponse(result);
       } catch (error) {
         logError("STOP_OFFSCREEN_RECORDING failed", error);
@@ -473,6 +536,45 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
+  if (message?.type === "GET_UPLOAD_SESSION") {
+    void (async () => {
+      try {
+        const session = await getUploadSession();
+        sendResponse({ ok: true, ...session });
+      } catch (error) {
+        logError("GET_UPLOAD_SESSION failed", error);
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      }
+    })();
+    return true;
+  }
+
+  if (message?.type === "UPLOAD_SUCCEEDED") {
+    void (async () => {
+      try {
+        const record = await saveUploadSuccessRecord(message);
+        sendResponse({ ok: true, record });
+      } catch (error) {
+        logError("UPLOAD_SUCCEEDED handler failed", error);
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      }
+    })();
+    return true;
+  }
+
+  if (message?.type === "UPLOAD_FAILED") {
+    void (async () => {
+      try {
+        const record = await saveUploadFailureRecord(message);
+        sendResponse({ ok: true, record });
+      } catch (error) {
+        logError("UPLOAD_FAILED handler failed", error);
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      }
+    })();
+    return true;
+  }
+
   if (message?.type === "UPLOAD_RECORDING") {
     void (async () => {
       try {
@@ -483,20 +585,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         sendResponse({ ok: true, record });
       } catch (error) {
         logError("background upload failed", error);
-        const failedRecord = {
-          id: crypto.randomUUID(),
+        const failedRecord = await saveUploadFailureRecord({
           fileName: message.fileName,
           meetUrl: message.meetUrl ?? null,
           meetTitle: message.meetTitle ?? null,
-          capturedAt: new Date().toISOString(),
-          uploadedAt: new Date().toISOString(),
-          uploadStatus: "failed",
           error: error instanceof Error ? error.message : String(error),
           bytes: message.bytes ?? 0,
           diagnostics: message.diagnostics ?? null,
-        };
-        await saveRecordingRecord(failedRecord);
-        await setLastCaptureStatus(failedRecord.error);
+        });
         sendResponse({ ok: false, error: failedRecord.error, record: failedRecord });
       }
     })();

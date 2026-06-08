@@ -145,6 +145,60 @@ async function persistDiagnostics(diagnostics) {
   });
 }
 
+async function uploadRecordingBlob({ blob, fileName, meetUrl, meetTitle, diagnostics }) {
+  await validateWebmBlob(blob, diagnostics.blobSize);
+
+  const sessionRes = await chrome.runtime.sendMessage({ type: "GET_UPLOAD_SESSION" });
+  if (!sessionRes?.ok) {
+    throw new Error(sessionRes?.error || "Could not get upload session.");
+  }
+
+  const file = new File([blob], fileName, { type: blob.type || "video/webm" });
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("fileName", fileName);
+  if (meetUrl) formData.append("meetUrl", meetUrl);
+  if (meetTitle) formData.append("meetTitle", meetTitle);
+
+  log("upload POST from offscreen", {
+    fileName,
+    bytes: file.size,
+    blobType: blob.type,
+    uploadUrl: sessionRes.uploadUrl,
+  });
+
+  const res = await fetch(sessionRes.uploadUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${sessionRes.accessToken}`,
+    },
+    body: formData,
+  });
+
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(body.error || `Upload failed (HTTP ${res.status}).`);
+  }
+
+  const notifyRes = await chrome.runtime.sendMessage({
+    type: "UPLOAD_SUCCEEDED",
+    meetingId: body.meetingId,
+    fileName: body.fileName ?? fileName,
+    meetUrl: body.meetUrl ?? meetUrl ?? null,
+    meetTitle: body.meetTitle ?? meetTitle ?? null,
+    capturedAt: body.capturedAt ?? new Date().toISOString(),
+    viewUrl: body.viewUrl ?? null,
+    bytes: file.size,
+    diagnostics,
+  });
+
+  if (!notifyRes?.ok) {
+    throw new Error(notifyRes?.error || "Upload succeeded but metadata save failed.");
+  }
+
+  return body;
+}
+
 async function beginRecording(message) {
   if (mediaRecorder && mediaRecorder.state === "recording") {
     throw new Error("Recording already in progress.");
@@ -245,20 +299,20 @@ async function endRecording() {
     return;
   }
 
-  const arrayBuffer = await blob.arrayBuffer();
-  const uploadResult = await chrome.runtime.sendMessage({
-    type: "UPLOAD_RECORDING",
-    arrayBuffer,
-    mimeType: blob.type,
-    fileName,
-    meetUrl,
-    meetTitle,
-    bytes: blob.size,
-    diagnostics,
-  });
-
-  if (!uploadResult?.ok) {
-    throw new Error(uploadResult?.error || "Upload failed.");
+  try {
+    await uploadRecordingBlob({ blob, fileName, meetUrl, meetTitle, diagnostics });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await chrome.runtime.sendMessage({
+      type: "UPLOAD_FAILED",
+      fileName,
+      error: message,
+      diagnostics,
+      meetUrl,
+      meetTitle,
+      bytes: blob.size,
+    });
+    throw error;
   }
 }
 
