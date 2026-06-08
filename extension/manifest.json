@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "MeetFlow Meet Capture",
-  "version": "0.1.6",
-  "description": "Capture Google Meet tab audio and upload to MeetFlow for transcription.",
+  "version": "0.1.7",
+  "description": "Capture Google Meet tab audio plus microphone, mix, and upload to MeetFlow for transcription.",
   "permissions": ["tabCapture", "storage", "tabs", "activeTab", "offscreen"],
   "host_permissions": [
     "https://meet.google.com/*",

@@ -164,7 +164,7 @@ async function refreshRecordings() {
     const status = item.uploadStatus ?? "unknown";
     const err = item.error ? ` — ${item.error}` : "";
     const diag = item.diagnostics
-      ? ` [audio=${item.diagnostics.audioTrackCount}, bytes=${item.diagnostics.blobSize}, type=${item.diagnostics.blobType}]`
+      ? ` [tab=${item.diagnostics.tabAudioTrackCount ?? "?"}, mic=${item.diagnostics.micTrackCount ?? "?"}, mixed=${item.diagnostics.mixedAudioTrackCount ?? item.diagnostics.audioTrackCount ?? "?"}, bytes=${item.diagnostics.blobSize}, type=${item.diagnostics.blobType}]`
       : "";
     const link = item.viewUrl
       ? ` <a href="${item.viewUrl}" target="_blank" rel="noreferrer">Open</a>`

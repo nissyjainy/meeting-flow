@@ -7,8 +7,14 @@ let mediaRecorder = null;
 let recordingStream = null;
 /** @type {MediaStream | null} */
 let fullStream = null;
+/** @type {MediaStream | null} */
+let micStream = null;
 /** @type {AudioContext | null} */
 let audioContext = null;
+/** @type {MediaStreamAudioDestinationNode | null} */
+let mixDestination = null;
+/** @type {object | null} */
+let mixDiagnostics = null;
 /** @type {BlobPart[]} */
 let recordedChunks = [];
 /** @type {string} */
@@ -69,49 +75,34 @@ async function getUserMediaFromStreamId(streamId) {
   }
 }
 
-async function routeTabAudioToOutput(stream) {
+async function getMicrophoneStream() {
+  return navigator.mediaDevices.getUserMedia({
+    audio: {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    },
+    video: false,
+  });
+}
+
+async function createMixedAudioStream(tabStream, microphoneStream) {
   audioContext = new AudioContext();
-  const source = audioContext.createMediaStreamSource(stream);
-  source.connect(audioContext.destination);
+  mixDestination = audioContext.createMediaStreamDestination();
+
+  const tabAudioStream = new MediaStream(tabStream.getAudioTracks());
+  const tabSource = audioContext.createMediaStreamSource(tabAudioStream);
+  const micSource = audioContext.createMediaStreamSource(microphoneStream);
+
+  tabSource.connect(mixDestination);
+  micSource.connect(mixDestination);
+  tabSource.connect(audioContext.destination);
+
   if (audioContext.state === "suspended") {
     await audioContext.resume();
   }
-}
 
-function buildRecordingSetup(stream) {
-  const audioTracks = stream.getAudioTracks();
-  const videoTracks = stream.getVideoTracks();
-
-  if (audioTracks.length === 0) {
-    throw new Error("No audio track in tab capture.");
-  }
-
-  for (const track of audioTracks) {
-    track.enabled = true;
-  }
-
-  if (videoTracks.length > 0) {
-    const candidates = [
-      "video/webm;codecs=vp8,opus",
-      "video/webm;codecs=vp9,opus",
-      "video/webm",
-    ];
-    for (const mimeType of candidates) {
-      if (MediaRecorder.isTypeSupported(mimeType)) {
-        return { stream, mimeType, mode: "video+audio" };
-      }
-    }
-  }
-
-  const audioOnly = new MediaStream(audioTracks);
-  const audioCandidates = ["audio/webm;codecs=opus", "audio/webm"];
-  for (const mimeType of audioCandidates) {
-    if (MediaRecorder.isTypeSupported(mimeType)) {
-      return { stream: audioOnly, mimeType, mode: "audio-only" };
-    }
-  }
-
-  return { stream: audioOnly, mimeType: "audio/webm", mode: "audio-only" };
+  return mixDestination.stream;
 }
 
 function cleanup() {
@@ -123,6 +114,12 @@ function cleanup() {
     for (const track of fullStream.getTracks()) track.stop();
     fullStream = null;
   }
+  if (micStream) {
+    for (const track of micStream.getTracks()) track.stop();
+    micStream = null;
+  }
+  mixDestination = null;
+  mixDiagnostics = null;
   if (audioContext) {
     void audioContext.close();
     audioContext = null;
@@ -213,14 +210,33 @@ async function beginRecording(message) {
 
   fullStream = await getUserMediaFromStreamId(message.streamId);
   logStreamDiagnostics("full tab stream", fullStream);
-  await routeTabAudioToOutput(fullStream);
 
-  const setup = buildRecordingSetup(fullStream);
-  recordingStream = setup.stream;
-  recorderMimeType = setup.mimeType;
-  recordingMode = setup.mode;
+  for (const track of fullStream.getAudioTracks()) {
+    track.enabled = true;
+  }
+
+  micStream = await getMicrophoneStream();
+  logStreamDiagnostics("microphone stream", micStream);
+
+  const mixedAudioStream = await createMixedAudioStream(fullStream, micStream);
+  logStreamDiagnostics("mixed audio stream", mixedAudioStream);
+
+  const mixedSetup = buildMixedRecordingStream(fullStream, mixedAudioStream);
+  recordingStream = mixedSetup.recordingStream;
+  const recorderSetup = selectRecorderMimeType(recordingStream);
+  recordingStream = recorderSetup.stream ?? recordingStream;
+  recorderMimeType = recorderSetup.mimeType;
+  recordingMode = recorderSetup.mode;
   recordedChunks = [];
 
+  mixDiagnostics = buildMixDiagnostics({
+    tabStream: fullStream,
+    micStream,
+    mixedAudioStream,
+    recordingStream,
+    recordingMode,
+  });
+  log("mix diagnostics", mixDiagnostics);
   logStreamDiagnostics("recording stream", recordingStream);
 
   mediaRecorder = new MediaRecorder(recordingStream, {
@@ -244,8 +260,7 @@ async function beginRecording(message) {
   log("recording started", {
     mimeType: recorderMimeType,
     mode: recordingMode,
-    audioTrackCount: recordingStream.getAudioTracks().length,
-    videoTrackCount: recordingStream.getVideoTracks().length,
+    ...mixDiagnostics,
   });
 }
 
@@ -269,12 +284,10 @@ async function endRecording() {
 
   const blob = new Blob(recordedChunks, { type: recorderMimeType });
   const diagnostics = {
-    audioTrackCount: recordingStream?.getAudioTracks().length ?? 0,
-    videoTrackCount: recordingStream?.getVideoTracks().length ?? 0,
+    ...(mixDiagnostics ?? {}),
     blobSize: blob.size,
     blobType: blob.type,
     chunkCount: recordedChunks.length,
-    recordingMode,
     capturedAt: new Date().toISOString(),
   };
 
