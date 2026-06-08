@@ -1,3 +1,5 @@
+importScripts("storage.js");
+
 const MEET_HOST = "meet.google.com";
 const LOG_PREFIX = "[meetflow-capture]";
 
@@ -45,12 +47,12 @@ function parseMeetCode(url) {
 }
 
 async function getConfig() {
-  const stored = await chrome.storage.local.get(["extensionConfig"]);
+  const stored = await extensionStorageGet(["extensionConfig"], "background");
   return { ...DEFAULT_CONFIG, ...(stored.extensionConfig ?? {}) };
 }
 
 async function getSession() {
-  const stored = await chrome.storage.local.get(["authSession", "extensionConfig"]);
+  const stored = await extensionStorageGet(["authSession", "extensionConfig"], "background");
   return {
     session: stored.authSession ?? null,
     config: { ...DEFAULT_CONFIG, ...(stored.extensionConfig ?? {}) },
@@ -58,14 +60,14 @@ async function getSession() {
 }
 
 async function saveRecordingRecord(record) {
-  const stored = await chrome.storage.local.get(["captureRecordings"]);
+  const stored = await extensionStorageGet(["captureRecordings"], "background");
   const recordings = Array.isArray(stored.captureRecordings) ? stored.captureRecordings : [];
   recordings.unshift(record);
-  await chrome.storage.local.set({ captureRecordings: recordings.slice(0, 20) });
+  await extensionStorageSet({ captureRecordings: recordings.slice(0, 20) }, "background");
 }
 
 async function setLastCaptureStatus(status) {
-  await chrome.storage.local.set({ lastCaptureStatus: status });
+  await extensionStorageSet({ lastCaptureStatus: status }, "background");
 }
 
 async function refreshAuthToken(config, session) {
@@ -92,7 +94,7 @@ async function refreshAuthToken(config, session) {
     refreshToken: body.refresh_token ?? session.refreshToken,
     expiresAt: Date.now() + (body.expires_in ?? 3600) * 1000,
   };
-  await chrome.storage.local.set({ authSession: next });
+  await extensionStorageSet({ authSession: next }, "background");
   return next;
 }
 
@@ -182,12 +184,12 @@ async function setBadgeForTab(tab) {
 
 async function syncCaptureState(next) {
   captureState = { ...captureState, ...next };
-  await chrome.storage.local.set({ captureState });
+  await extensionStorageSet({ captureState }, "background");
 }
 
 async function clearCaptureState(statusMessage) {
   captureState = { ...IDLE_CAPTURE_STATE };
-  await chrome.storage.local.set({ captureState });
+  await extensionStorageSet({ captureState }, "background");
   if (statusMessage) {
     await setLastCaptureStatus(statusMessage);
   }
@@ -226,7 +228,7 @@ async function reconcileCaptureState({ forceClear = false } = {}) {
     return { captureState, recorderActive: false, staleCleared: true };
   }
 
-  const stored = await chrome.storage.local.get(["captureState"]);
+  const stored = await extensionStorageGet(["captureState"], "background");
   if (stored.captureState) {
     captureState = { ...captureState, ...stored.captureState };
   }
@@ -249,11 +251,15 @@ async function reconcileCaptureState({ forceClear = false } = {}) {
 }
 
 async function initializeExtensionState() {
-  const stored = await chrome.storage.local.get(["captureState"]);
-  if (stored.captureState) {
-    captureState = { ...IDLE_CAPTURE_STATE, ...stored.captureState };
+  try {
+    const stored = await extensionStorageGet(["captureState"], "background");
+    if (stored.captureState) {
+      captureState = { ...IDLE_CAPTURE_STATE, ...stored.captureState };
+    }
+    await reconcileCaptureState();
+  } catch (error) {
+    logError("initializeExtensionState failed", error);
   }
-  await reconcileCaptureState();
 }
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
@@ -404,9 +410,25 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
+  if (message?.type === "SAVE_LAST_DIAGNOSTICS") {
+    void (async () => {
+      try {
+        await extensionStorageSet(
+          { lastRecordingDiagnostics: message.diagnostics ?? null },
+          "background",
+        );
+        sendResponse({ ok: true });
+      } catch (error) {
+        logError("SAVE_LAST_DIAGNOSTICS failed", error);
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      }
+    })();
+    return true;
+  }
+
   if (message?.type === "GET_LAST_DIAGNOSTICS") {
     void (async () => {
-      const stored = await chrome.storage.local.get(["lastRecordingDiagnostics"]);
+      const stored = await extensionStorageGet(["lastRecordingDiagnostics"], "background");
       sendResponse({ ok: true, diagnostics: stored.lastRecordingDiagnostics ?? null });
     })();
     return true;
@@ -420,14 +442,17 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         meetUrl: message.meetUrl ?? null,
         startedAt: message.startedAt ?? new Date().toISOString(),
       });
-      await chrome.storage.local.set({
-        pendingCaptureContext: {
-          tabId: message.tabId ?? null,
-          meetUrl: message.meetUrl ?? null,
-          meetCode: message.meetCode ?? null,
-          title: message.title ?? null,
+      await extensionStorageSet(
+        {
+          pendingCaptureContext: {
+            tabId: message.tabId ?? null,
+            meetUrl: message.meetUrl ?? null,
+            meetCode: message.meetCode ?? null,
+            title: message.title ?? null,
+          },
         },
-      });
+        "background",
+      );
       await setLastCaptureStatus("Recording…");
       log("capture started", message);
       sendResponse({ ok: true });
@@ -453,7 +478,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       try {
         const record = await uploadRecordingInBackground(message);
         if (message.diagnostics) {
-          await chrome.storage.local.set({ lastRecordingDiagnostics: message.diagnostics });
+          await extensionStorageSet({ lastRecordingDiagnostics: message.diagnostics }, "background");
         }
         sendResponse({ ok: true, record });
       } catch (error) {
@@ -488,7 +513,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   if (message?.type === "GET_RECORDINGS") {
     void (async () => {
-      const stored = await chrome.storage.local.get(["captureRecordings", "lastCaptureStatus"]);
+      const stored = await extensionStorageGet(["captureRecordings", "lastCaptureStatus"], "background");
       sendResponse({
         ok: true,
         recordings: stored.captureRecordings ?? [],

@@ -57,7 +57,7 @@ async function getConfig() {
 }
 
 async function getSession() {
-  const stored = await chrome.storage.local.get(["authSession", "extensionConfig"]);
+  const stored = await extensionStorageGet(["authSession", "extensionConfig"], "popup");
   return {
     session: stored.authSession ?? null,
     config: stored.extensionConfig ?? {},
@@ -65,15 +65,15 @@ async function getSession() {
 }
 
 async function saveConfig(config) {
-  await chrome.storage.local.set({ extensionConfig: config });
+  await extensionStorageSet({ extensionConfig: config }, "popup");
 }
 
 async function saveSession(session) {
-  await chrome.storage.local.set({ authSession: session });
+  await extensionStorageSet({ authSession: session }, "popup");
 }
 
 async function clearSession() {
-  await chrome.storage.local.remove(["authSession"]);
+  await extensionStorageRemove(["authSession"], "popup");
 }
 
 function needsSetup(config) {

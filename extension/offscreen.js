@@ -139,7 +139,10 @@ function buildFileName(meetCode) {
 }
 
 async function persistDiagnostics(diagnostics) {
-  await chrome.storage.local.set({ lastRecordingDiagnostics: diagnostics });
+  await chrome.runtime.sendMessage({
+    type: "SAVE_LAST_DIAGNOSTICS",
+    diagnostics,
+  });
 }
 
 async function beginRecording(message) {
