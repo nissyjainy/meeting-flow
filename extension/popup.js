@@ -19,6 +19,10 @@ const stopBtn = $("stop-btn");
 let mediaRecorder = null;
 /** @type {MediaStream | null} */
 let captureStream = null;
+/** @type {MediaStream | null} */
+let captureFullStream = null;
+/** @type {AudioContext | null} */
+let captureAudioContext = null;
 /** @type {BlobPart[]} */
 let recordedChunks = [];
 /** @type {{ tabId: number; meetUrl: string; meetCode: string | null; title: string | null } | null} */
@@ -204,24 +208,50 @@ function buildFileName(meetCode) {
   return `meet-capture-${suffix}${stamp}.webm`;
 }
 
-function pickRecorderMimeType() {
-  const candidates = ["audio/webm;codecs=opus", "audio/webm", "video/webm"];
+function logStreamDiagnostics(label, stream) {
+  const audioTracks = stream.getAudioTracks();
+  const videoTracks = stream.getVideoTracks();
+  log(`${label} tracks`, {
+    audioTrackCount: audioTracks.length,
+    videoTrackCount: videoTracks.length,
+    audioTracks: audioTracks.map((track) => ({
+      id: track.id,
+      label: track.label,
+      enabled: track.enabled,
+      muted: track.muted,
+      readyState: track.readyState,
+    })),
+    videoTracks: videoTracks.map((track) => ({
+      id: track.id,
+      label: track.label,
+      enabled: track.enabled,
+      muted: track.muted,
+      readyState: track.readyState,
+    })),
+  });
+}
+
+function pickRecorderMimeType(stream) {
+  const hasVideo = stream.getVideoTracks().length > 0;
+  const candidates = hasVideo
+    ? ["video/webm;codecs=vp8,opus", "video/webm", "audio/webm;codecs=opus", "audio/webm"]
+    : ["audio/webm;codecs=opus", "audio/webm"];
   for (const type of candidates) {
     if (MediaRecorder.isTypeSupported(type)) return type;
   }
-  return "audio/webm";
+  return hasVideo ? "video/webm" : "audio/webm";
 }
 
-async function openTabCaptureStream(tabId) {
-  const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tabId });
-  log("tabCapture stream id", { tabId, streamId: Boolean(streamId) });
-
+async function getUserMediaFromStreamId(streamId) {
   const modernConstraints = {
     audio: {
       chromeMediaSource: "tab",
       chromeMediaSourceId: streamId,
     },
-    video: false,
+    video: {
+      chromeMediaSource: "tab",
+      chromeMediaSourceId: streamId,
+    },
   };
 
   const legacyConstraints = {
@@ -231,7 +261,12 @@ async function openTabCaptureStream(tabId) {
         chromeMediaSourceId: streamId,
       },
     },
-    video: false,
+    video: {
+      mandatory: {
+        chromeMediaSource: "tab",
+        chromeMediaSourceId: streamId,
+      },
+    },
   };
 
   try {
@@ -242,10 +277,94 @@ async function openTabCaptureStream(tabId) {
   }
 }
 
+function captureTabViaLegacyApi() {
+  return new Promise((resolve, reject) => {
+    chrome.tabCapture.capture({ audio: true, video: true }, (stream) => {
+      if (chrome.runtime.lastError || !stream) {
+        reject(new Error(chrome.runtime.lastError?.message || "tabCapture.capture() returned no stream."));
+        return;
+      }
+      resolve(stream);
+    });
+  });
+}
+
+async function openTabCaptureStream(tabId) {
+  const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tabId });
+  log("tabCapture stream id", { tabId, streamId: Boolean(streamId) });
+
+  let fullStream;
+  try {
+    fullStream = await getUserMediaFromStreamId(streamId);
+    logStreamDiagnostics("getMediaStreamId stream", fullStream);
+  } catch (streamIdError) {
+    log("getMediaStreamId path failed, trying tabCapture.capture()", streamIdError);
+    fullStream = await captureTabViaLegacyApi();
+    logStreamDiagnostics("tabCapture.capture stream", fullStream);
+  }
+
+  await routeTabAudioToOutput(fullStream);
+  return fullStream;
+}
+
+async function routeTabAudioToOutput(stream) {
+  captureAudioContext = new AudioContext();
+  const source = captureAudioContext.createMediaStreamSource(stream);
+  source.connect(captureAudioContext.destination);
+  if (captureAudioContext.state === "suspended") {
+    await captureAudioContext.resume();
+  }
+  log("AudioContext routing enabled", { state: captureAudioContext.state });
+}
+
+function buildRecordingSetup(fullStream) {
+  const audioTracks = fullStream.getAudioTracks();
+  const videoTracks = fullStream.getVideoTracks();
+
+  if (audioTracks.length === 0) {
+    throw new Error(
+      "No audio track in tab capture. Join the Meet call, unmute speakers, and try again.",
+    );
+  }
+
+  for (const track of audioTracks) {
+    track.enabled = true;
+  }
+
+  // Tab capture is most reliable when muxing the full stream into video/webm.
+  if (videoTracks.length > 0) {
+    const videoMimeCandidates = [
+      "video/webm;codecs=vp8,opus",
+      "video/webm;codecs=vp9,opus",
+      "video/webm",
+    ];
+    for (const mimeType of videoMimeCandidates) {
+      if (MediaRecorder.isTypeSupported(mimeType)) {
+        return { stream: fullStream, mimeType, mode: "video+audio" };
+      }
+    }
+  }
+
+  const audioOnlyStream = new MediaStream(audioTracks);
+  return {
+    stream: audioOnlyStream,
+    mimeType: pickRecorderMimeType(audioOnlyStream),
+    mode: "audio-only",
+  };
+}
+
 function cleanupStream() {
   if (captureStream) {
     for (const track of captureStream.getTracks()) track.stop();
     captureStream = null;
+  }
+  if (captureFullStream) {
+    for (const track of captureFullStream.getTracks()) track.stop();
+    captureFullStream = null;
+  }
+  if (captureAudioContext) {
+    void captureAudioContext.close();
+    captureAudioContext = null;
   }
 }
 
@@ -265,15 +384,26 @@ async function startCapture() {
   setProgress(0);
   log("start capture", activeMeet);
 
-  captureStream = await openTabCaptureStream(activeMeet.tabId);
+  captureFullStream = await openTabCaptureStream(activeMeet.tabId);
+  const recordingSetup = buildRecordingSetup(captureFullStream);
+  captureStream = recordingSetup.stream;
+  recorderMimeType = recordingSetup.mimeType;
+  logStreamDiagnostics("recording stream", captureStream);
+
   recordedChunks = [];
-  recorderMimeType = pickRecorderMimeType();
   mediaRecorder = new MediaRecorder(captureStream, {
     mimeType: recorderMimeType,
     audioBitsPerSecond: 128000,
+    videoBitsPerSecond: recordingSetup.mode === "video+audio" ? 250000 : undefined,
   });
 
-  log("MediaRecorder created", { mimeType: recorderMimeType, state: mediaRecorder.state });
+  log("MediaRecorder created", {
+    mimeType: recorderMimeType,
+    mode: recordingSetup.mode,
+    state: mediaRecorder.state,
+    audioTrackCount: captureStream.getAudioTracks().length,
+    videoTrackCount: captureStream.getVideoTracks().length,
+  });
 
   mediaRecorder.ondataavailable = (event) => {
     if (event.data?.size > 0) {
@@ -360,7 +490,14 @@ async function finalizeCapture({ upload }) {
   startBtn.disabled = false;
   stopBtn.disabled = true;
 
-  log("finalize capture", { upload, bytes: blob.size, chunkCount, recorderState: recorder?.state });
+  log("finalize capture", {
+    upload,
+    blobSize: blob.size,
+    blobType: blob.type,
+    chunkCount,
+    recorderState: recorder?.state,
+    recorderMimeType: mimeType,
+  });
 
   if (!upload) {
     setCaptureStatus("Recording cancelled.");
@@ -465,6 +602,7 @@ startBtn.addEventListener("click", () => {
     logError("startCapture failed", error);
     setCaptureStatus(error instanceof Error ? error.message : "Could not start capture.");
     cleanupStream();
+    captureFullStream = null;
     mediaRecorder = null;
     recordedChunks = [];
     startBtn.disabled = false;
