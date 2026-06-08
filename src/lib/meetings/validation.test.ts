@@ -33,9 +33,19 @@ describe("meeting MIME validation", () => {
   });
 
   it("validates extension recordings with codec MIME types", () => {
-    const file = new File(["audio"], "meet-capture.webm", {
+    const file = new File(["x".repeat(12_000)], "meet-capture.webm", {
       type: "audio/webm;codecs=opus",
     });
     expect(validateMeetingFile(file)).toEqual({ valid: true });
+  });
+
+  it("rejects tiny webm captures that are header-only", () => {
+    const file = new File(["x".repeat(15)], "meet-capture.webm", {
+      type: "video/webm",
+    });
+    expect(validateMeetingFile(file)).toEqual({
+      valid: false,
+      message: "Recording is too small (15 bytes). Record at least 10 seconds of audio.",
+    });
   });
 });

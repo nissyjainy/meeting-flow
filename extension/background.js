@@ -94,7 +94,27 @@ async function refreshAuthToken(config, session) {
   return next;
 }
 
-async function uploadRecordingInBackground({ arrayBuffer, mimeType, fileName, meetUrl, meetTitle, bytes }) {
+async function ensureOffscreenDocument() {
+  const contexts = await chrome.runtime.getContexts({
+    contextTypes: ["OFFSCREEN_DOCUMENT"],
+    documentUrls: [chrome.runtime.getURL("offscreen.html")],
+  });
+  if (contexts.length > 0) return;
+
+  await chrome.offscreen.createDocument({
+    url: "offscreen.html",
+    reasons: ["USER_MEDIA"],
+    justification: "Record Google Meet tab audio while the popup is closed.",
+  });
+  log("offscreen document created");
+}
+
+async function sendToOffscreen(message) {
+  await ensureOffscreenDocument();
+  return chrome.runtime.sendMessage(message);
+}
+
+async function uploadRecordingInBackground({ arrayBuffer, mimeType, fileName, meetUrl, meetTitle, bytes, diagnostics }) {
   log("background upload started", { fileName, bytes });
 
   const { config, session: initialSession } = await getSession();
@@ -139,6 +159,7 @@ async function uploadRecordingInBackground({ arrayBuffer, mimeType, fileName, me
     uploadStatus: "success",
     viewUrl: body.viewUrl ?? null,
     bytes: bytes ?? file.size,
+    diagnostics: diagnostics ?? null,
   };
 
   await saveRecordingRecord(record);
@@ -202,6 +223,81 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
+  if (message?.type === "START_OFFSCREEN_RECORDING") {
+    void (async () => {
+      try {
+        await syncCaptureState({
+          recording: true,
+          tabId: message.tabId ?? null,
+          meetUrl: message.meetUrl ?? null,
+          startedAt: new Date().toISOString(),
+        });
+        await setLastCaptureStatus("Recording…");
+        const result = await sendToOffscreen({
+          type: "BEGIN_RECORDING",
+          streamId: message.streamId,
+          tabId: message.tabId,
+          meetUrl: message.meetUrl,
+          meetCode: message.meetCode,
+          title: message.title,
+        });
+        sendResponse(result);
+      } catch (error) {
+        logError("START_OFFSCREEN_RECORDING failed", error);
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      }
+    })();
+    return true;
+  }
+
+  if (message?.type === "STOP_OFFSCREEN_RECORDING") {
+    void (async () => {
+      try {
+        await setLastCaptureStatus("Stopping recording…");
+        const result = await sendToOffscreen({ type: "END_RECORDING" });
+        await syncCaptureState({
+          recording: false,
+          tabId: null,
+          meetUrl: null,
+          startedAt: null,
+        });
+        sendResponse(result);
+      } catch (error) {
+        logError("STOP_OFFSCREEN_RECORDING failed", error);
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      }
+    })();
+    return true;
+  }
+
+  if (message?.type === "RECORDING_FAILED") {
+    void (async () => {
+      const failedRecord = {
+        id: crypto.randomUUID(),
+        fileName: message.fileName ?? "meet-capture.webm",
+        meetUrl: message.meetUrl ?? null,
+        meetTitle: message.meetTitle ?? null,
+        capturedAt: new Date().toISOString(),
+        uploadStatus: "failed",
+        error: message.error,
+        bytes: message.diagnostics?.blobSize ?? 0,
+        diagnostics: message.diagnostics ?? null,
+      };
+      await saveRecordingRecord(failedRecord);
+      await setLastCaptureStatus(message.error);
+      sendResponse({ ok: true });
+    })();
+    return true;
+  }
+
+  if (message?.type === "GET_LAST_DIAGNOSTICS") {
+    void (async () => {
+      const stored = await chrome.storage.local.get(["lastRecordingDiagnostics"]);
+      sendResponse({ ok: true, diagnostics: stored.lastRecordingDiagnostics ?? null });
+    })();
+    return true;
+  }
+
   if (message?.type === "CAPTURE_STARTED") {
     void (async () => {
       await syncCaptureState({
@@ -242,6 +338,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     void (async () => {
       try {
         const record = await uploadRecordingInBackground(message);
+        if (message.diagnostics) {
+          await chrome.storage.local.set({ lastRecordingDiagnostics: message.diagnostics });
+        }
         sendResponse({ ok: true, record });
       } catch (error) {
         logError("background upload failed", error);
@@ -255,6 +354,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           uploadStatus: "failed",
           error: error instanceof Error ? error.message : String(error),
           bytes: message.bytes ?? 0,
+          diagnostics: message.diagnostics ?? null,
         };
         await saveRecordingRecord(failedRecord);
         await setLastCaptureStatus(failedRecord.error);
@@ -299,7 +399,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         fileName: message.fileName ?? "meet-capture.webm",
         capturedAt: new Date().toISOString(),
         uploadStatus: "failed",
-        error: "Recording was empty. Keep the popup open while recording.",
+        error: "Recording was empty. Record at least 10 seconds in the Meet call.",
         bytes: 0,
       };
       await saveRecordingRecord(failedRecord);

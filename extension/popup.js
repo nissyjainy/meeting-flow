@@ -15,22 +15,8 @@ const recordingsList = $("recordings-list");
 const startBtn = $("start-btn");
 const stopBtn = $("stop-btn");
 
-/** @type {MediaRecorder | null} */
-let mediaRecorder = null;
-/** @type {MediaStream | null} */
-let captureStream = null;
-/** @type {MediaStream | null} */
-let captureFullStream = null;
-/** @type {AudioContext | null} */
-let captureAudioContext = null;
-/** @type {BlobPart[]} */
-let recordedChunks = [];
 /** @type {{ tabId: number; meetUrl: string; meetCode: string | null; title: string | null } | null} */
 let activeMeet = null;
-/** @type {string} */
-let recorderMimeType = "audio/webm";
-let shouldUploadOnStop = true;
-let isFinalizing = false;
 
 function log(step, detail) {
   console.info(`${LOG_PREFIX} ${step}`, detail ?? "");
@@ -120,7 +106,8 @@ async function refreshMeetTabStatus() {
   if (res.onMeet) {
     const code = res.meetCode ? ` (${res.meetCode})` : "";
     meetStatusEl.innerHTML = `<span class="meet-ok">Google Meet tab detected${code}</span>`;
-    startBtn.disabled = Boolean(mediaRecorder && mediaRecorder.state === "recording");
+    const state = await sendMessage({ type: "GET_CAPTURE_STATE" });
+    startBtn.disabled = Boolean(state?.captureState?.recording);
   } else {
     meetStatusEl.innerHTML =
       '<span class="meet-bad">Open a meet.google.com tab and click this extension again.</span>';
@@ -136,6 +123,12 @@ async function refreshRecordings() {
     setCaptureStatus(res.lastCaptureStatus);
   }
 
+  const diagRes = await sendMessage({ type: "GET_LAST_DIAGNOSTICS" });
+  if (diagRes?.diagnostics) {
+    const d = diagRes.diagnostics;
+    log("last diagnostics", d);
+  }
+
   recordingsList.innerHTML = "";
 
   if (!recordings.length) {
@@ -148,10 +141,13 @@ async function refreshRecordings() {
     const when = new Date(item.capturedAt).toLocaleString();
     const status = item.uploadStatus ?? "unknown";
     const err = item.error ? ` — ${item.error}` : "";
+    const diag = item.diagnostics
+      ? ` [audio=${item.diagnostics.audioTrackCount}, bytes=${item.diagnostics.blobSize}, type=${item.diagnostics.blobType}]`
+      : "";
     const link = item.viewUrl
       ? ` <a href="${item.viewUrl}" target="_blank" rel="noreferrer">Open</a>`
       : "";
-    li.innerHTML = `${when} · ${item.fileName} · <strong>${status}</strong>${err}${link}`;
+    li.innerHTML = `${when} · ${item.fileName} · <strong>${status}</strong>${diag}${err}${link}`;
     recordingsList.appendChild(li);
   }
 }
@@ -192,7 +188,6 @@ async function signIn() {
 
   $("password").value = "";
   setCaptureStatus("Signed in.");
-  log("signed in", { email });
   await initUi();
 }
 
@@ -200,172 +195,6 @@ async function signOut() {
   await clearSession();
   setCaptureStatus("Signed out.");
   await initUi();
-}
-
-function buildFileName(meetCode) {
-  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const suffix = meetCode ? `${meetCode}-` : "";
-  return `meet-capture-${suffix}${stamp}.webm`;
-}
-
-function logStreamDiagnostics(label, stream) {
-  const audioTracks = stream.getAudioTracks();
-  const videoTracks = stream.getVideoTracks();
-  log(`${label} tracks`, {
-    audioTrackCount: audioTracks.length,
-    videoTrackCount: videoTracks.length,
-    audioTracks: audioTracks.map((track) => ({
-      id: track.id,
-      label: track.label,
-      enabled: track.enabled,
-      muted: track.muted,
-      readyState: track.readyState,
-    })),
-    videoTracks: videoTracks.map((track) => ({
-      id: track.id,
-      label: track.label,
-      enabled: track.enabled,
-      muted: track.muted,
-      readyState: track.readyState,
-    })),
-  });
-}
-
-function pickRecorderMimeType(stream) {
-  const hasVideo = stream.getVideoTracks().length > 0;
-  const candidates = hasVideo
-    ? ["video/webm;codecs=vp8,opus", "video/webm", "audio/webm;codecs=opus", "audio/webm"]
-    : ["audio/webm;codecs=opus", "audio/webm"];
-  for (const type of candidates) {
-    if (MediaRecorder.isTypeSupported(type)) return type;
-  }
-  return hasVideo ? "video/webm" : "audio/webm";
-}
-
-async function getUserMediaFromStreamId(streamId) {
-  const modernConstraints = {
-    audio: {
-      chromeMediaSource: "tab",
-      chromeMediaSourceId: streamId,
-    },
-    video: {
-      chromeMediaSource: "tab",
-      chromeMediaSourceId: streamId,
-    },
-  };
-
-  const legacyConstraints = {
-    audio: {
-      mandatory: {
-        chromeMediaSource: "tab",
-        chromeMediaSourceId: streamId,
-      },
-    },
-    video: {
-      mandatory: {
-        chromeMediaSource: "tab",
-        chromeMediaSourceId: streamId,
-      },
-    },
-  };
-
-  try {
-    return await navigator.mediaDevices.getUserMedia(modernConstraints);
-  } catch (modernError) {
-    log("getUserMedia modern constraints failed, retrying legacy", modernError);
-    return navigator.mediaDevices.getUserMedia(legacyConstraints);
-  }
-}
-
-function captureTabViaLegacyApi() {
-  return new Promise((resolve, reject) => {
-    chrome.tabCapture.capture({ audio: true, video: true }, (stream) => {
-      if (chrome.runtime.lastError || !stream) {
-        reject(new Error(chrome.runtime.lastError?.message || "tabCapture.capture() returned no stream."));
-        return;
-      }
-      resolve(stream);
-    });
-  });
-}
-
-async function openTabCaptureStream(tabId) {
-  const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tabId });
-  log("tabCapture stream id", { tabId, streamId: Boolean(streamId) });
-
-  let fullStream;
-  try {
-    fullStream = await getUserMediaFromStreamId(streamId);
-    logStreamDiagnostics("getMediaStreamId stream", fullStream);
-  } catch (streamIdError) {
-    log("getMediaStreamId path failed, trying tabCapture.capture()", streamIdError);
-    fullStream = await captureTabViaLegacyApi();
-    logStreamDiagnostics("tabCapture.capture stream", fullStream);
-  }
-
-  await routeTabAudioToOutput(fullStream);
-  return fullStream;
-}
-
-async function routeTabAudioToOutput(stream) {
-  captureAudioContext = new AudioContext();
-  const source = captureAudioContext.createMediaStreamSource(stream);
-  source.connect(captureAudioContext.destination);
-  if (captureAudioContext.state === "suspended") {
-    await captureAudioContext.resume();
-  }
-  log("AudioContext routing enabled", { state: captureAudioContext.state });
-}
-
-function buildRecordingSetup(fullStream) {
-  const audioTracks = fullStream.getAudioTracks();
-  const videoTracks = fullStream.getVideoTracks();
-
-  if (audioTracks.length === 0) {
-    throw new Error(
-      "No audio track in tab capture. Join the Meet call, unmute speakers, and try again.",
-    );
-  }
-
-  for (const track of audioTracks) {
-    track.enabled = true;
-  }
-
-  // Tab capture is most reliable when muxing the full stream into video/webm.
-  if (videoTracks.length > 0) {
-    const videoMimeCandidates = [
-      "video/webm;codecs=vp8,opus",
-      "video/webm;codecs=vp9,opus",
-      "video/webm",
-    ];
-    for (const mimeType of videoMimeCandidates) {
-      if (MediaRecorder.isTypeSupported(mimeType)) {
-        return { stream: fullStream, mimeType, mode: "video+audio" };
-      }
-    }
-  }
-
-  const audioOnlyStream = new MediaStream(audioTracks);
-  return {
-    stream: audioOnlyStream,
-    mimeType: pickRecorderMimeType(audioOnlyStream),
-    mode: "audio-only",
-  };
-}
-
-function cleanupStream() {
-  if (captureStream) {
-    for (const track of captureStream.getTracks()) track.stop();
-    captureStream = null;
-  }
-  if (captureFullStream) {
-    for (const track of captureFullStream.getTracks()) track.stop();
-    captureFullStream = null;
-  }
-  if (captureAudioContext) {
-    void captureAudioContext.close();
-    captureAudioContext = null;
-  }
 }
 
 async function startCapture() {
@@ -380,173 +209,44 @@ async function startCapture() {
     return;
   }
 
-  setCaptureStatus("Requesting tab audio…");
+  setCaptureStatus("Starting offscreen capture…");
   setProgress(0);
-  log("start capture", activeMeet);
 
-  captureFullStream = await openTabCaptureStream(activeMeet.tabId);
-  const recordingSetup = buildRecordingSetup(captureFullStream);
-  captureStream = recordingSetup.stream;
-  recorderMimeType = recordingSetup.mimeType;
-  logStreamDiagnostics("recording stream", captureStream);
+  const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: activeMeet.tabId });
+  log("stream id acquired in popup", { tabId: activeMeet.tabId, hasStreamId: Boolean(streamId) });
 
-  recordedChunks = [];
-  mediaRecorder = new MediaRecorder(captureStream, {
-    mimeType: recorderMimeType,
-    audioBitsPerSecond: 128000,
-    videoBitsPerSecond: recordingSetup.mode === "video+audio" ? 250000 : undefined,
-  });
-
-  log("MediaRecorder created", {
-    mimeType: recorderMimeType,
-    mode: recordingSetup.mode,
-    state: mediaRecorder.state,
-    audioTrackCount: captureStream.getAudioTracks().length,
-    videoTrackCount: captureStream.getVideoTracks().length,
-  });
-
-  mediaRecorder.ondataavailable = (event) => {
-    if (event.data?.size > 0) {
-      recordedChunks.push(event.data);
-      log("chunk", { size: event.data.size, chunks: recordedChunks.length });
-    }
-  };
-
-  shouldUploadOnStop = true;
-
-  mediaRecorder.onerror = (event) => {
-    logError("MediaRecorder error", event.error || event);
-    setCaptureStatus("Recording error. Try again.");
-    shouldUploadOnStop = false;
-    if (mediaRecorder?.state === "recording") {
-      try {
-        mediaRecorder.stop();
-      } catch (stopError) {
-        logError("stop after recorder error failed", stopError);
-      }
-    }
-  };
-
-  mediaRecorder.onstop = () => {
-    log("MediaRecorder stopped", { chunks: recordedChunks.length });
-    void finalizeCapture({ upload: shouldUploadOnStop });
-    shouldUploadOnStop = true;
-  };
-
-  mediaRecorder.start(1000);
-  log("MediaRecorder started", { state: mediaRecorder.state });
-
-  startBtn.disabled = true;
-  stopBtn.disabled = false;
-  setCaptureStatus("Recording… Keep this popup open.");
-  await sendMessage({
-    type: "CAPTURE_STARTED",
+  const res = await sendMessage({
+    type: "START_OFFSCREEN_RECORDING",
+    streamId,
     tabId: activeMeet.tabId,
     meetUrl: activeMeet.meetUrl,
     meetCode: activeMeet.meetCode,
     title: activeMeet.title,
-    startedAt: new Date().toISOString(),
   });
+
+  if (!res?.ok) {
+    throw new Error(res?.error || "Could not start recording.");
+  }
+
+  startBtn.disabled = true;
+  stopBtn.disabled = false;
+  setCaptureStatus("Recording… You can close this popup.");
 }
 
 async function stopCapture() {
-  if (!mediaRecorder || mediaRecorder.state === "inactive") {
-    setCaptureStatus("No active recording.");
-    return;
-  }
-
   stopBtn.disabled = true;
-  setCaptureStatus("Stopping recording…");
-  log("stop requested", { state: mediaRecorder.state, chunks: recordedChunks.length });
+  setCaptureStatus("Stopping and uploading…");
+  setProgress(50);
 
-  try {
-    if (mediaRecorder.state === "recording") {
-      mediaRecorder.requestData();
-    }
-    mediaRecorder.stop();
-  } catch (error) {
-    logError("mediaRecorder.stop failed", error);
-    setCaptureStatus("Could not stop recording.");
-    startBtn.disabled = false;
-    stopBtn.disabled = true;
+  const res = await sendMessage({ type: "STOP_OFFSCREEN_RECORDING" });
+  if (!res?.ok) {
+    throw new Error(res?.error || "Could not stop recording.");
   }
-}
 
-async function finalizeCapture({ upload }) {
-  if (isFinalizing) return;
-  isFinalizing = true;
-
-  const mimeType = mediaRecorder?.mimeType || recorderMimeType || "audio/webm";
-  const recorder = mediaRecorder;
-  mediaRecorder = null;
-
-  const blob = new Blob(recordedChunks, { type: mimeType });
-  const chunkCount = recordedChunks.length;
-  recordedChunks = [];
-
-  cleanupStream();
-  await sendMessage({ type: "CAPTURE_STOPPED" });
-
+  setProgress(100);
   startBtn.disabled = false;
   stopBtn.disabled = true;
-
-  log("finalize capture", {
-    upload,
-    blobSize: blob.size,
-    blobType: blob.type,
-    chunkCount,
-    recorderState: recorder?.state,
-    recorderMimeType: mimeType,
-  });
-
-  if (!upload) {
-    setCaptureStatus("Recording cancelled.");
-    isFinalizing = false;
-    return;
-  }
-
-  const fileName = buildFileName(activeMeet?.meetCode ?? null);
-
-  if (!blob.size) {
-    const message = "Recording was empty. Keep the popup open while recording.";
-    setCaptureStatus(message);
-    await sendMessage({ type: "RECORDING_EMPTY", fileName });
-    await refreshRecordings();
-    isFinalizing = false;
-    return;
-  }
-
-  try {
-    setCaptureStatus(`Uploading ${fileName} (${Math.round(blob.size / 1024)} KB)…`);
-    setProgress(10);
-
-    const arrayBuffer = await blob.arrayBuffer();
-    const res = await sendMessage({
-      type: "UPLOAD_RECORDING",
-      arrayBuffer,
-      mimeType,
-      fileName,
-      meetUrl: activeMeet?.meetUrl ?? null,
-      meetTitle: activeMeet?.title ?? null,
-      bytes: blob.size,
-    });
-
-    if (!res?.ok) {
-      throw new Error(res?.error || "Upload failed.");
-    }
-
-    setProgress(100);
-    setCaptureStatus(`Upload complete. Meeting ${res.record?.meetingId ?? ""}`.trim());
-    log("upload complete", res.record);
-    await refreshRecordings();
-  } catch (error) {
-    logError("upload failed", error);
-    setCaptureStatus(error instanceof Error ? error.message : "Upload failed.");
-    setProgress(0);
-    await refreshRecordings();
-  } finally {
-    isFinalizing = false;
-  }
+  await refreshRecordings();
 }
 
 async function initUi() {
@@ -585,7 +285,6 @@ $("save-config-btn").addEventListener("click", async () => {
   };
   await saveConfig(config);
   setCaptureStatus("Settings saved.");
-  log("config saved", { meetflowUrl: config.meetflowUrl });
   await initUi();
 });
 
@@ -601,17 +300,18 @@ startBtn.addEventListener("click", () => {
   void startCapture().catch((error) => {
     logError("startCapture failed", error);
     setCaptureStatus(error instanceof Error ? error.message : "Could not start capture.");
-    cleanupStream();
-    captureFullStream = null;
-    mediaRecorder = null;
-    recordedChunks = [];
     startBtn.disabled = false;
     stopBtn.disabled = true;
   });
 });
 
 stopBtn.addEventListener("click", () => {
-  void stopCapture();
+  void stopCapture().catch((error) => {
+    logError("stopCapture failed", error);
+    setCaptureStatus(error instanceof Error ? error.message : "Could not stop capture.");
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+  });
 });
 
 void initUi();

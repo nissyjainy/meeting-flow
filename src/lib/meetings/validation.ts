@@ -36,9 +36,23 @@ export function normalizeMeetingMimeType(mimeType: string, fileName?: string): s
   return base || "application/octet-stream";
 }
 
+/** Chrome extension captures shorter than this are invalid WebM headers only. */
+export const MIN_WEBM_RECORDING_BYTES = 10_000;
+
 export function validateMeetingFile(file: File): FileValidationResult {
   if (!file || file.size === 0) {
     return { valid: false, message: "File is empty." };
+  }
+
+  const extension = getExtension(file.name);
+  if (
+    extension === ".webm" &&
+    file.size < MIN_WEBM_RECORDING_BYTES
+  ) {
+    return {
+      valid: false,
+      message: `Recording is too small (${file.size} bytes). Record at least 10 seconds of audio.`,
+    };
   }
 
   if (file.size > MAX_MEETING_FILE_BYTES) {
@@ -48,7 +62,6 @@ export function validateMeetingFile(file: File): FileValidationResult {
     };
   }
 
-  const extension = getExtension(file.name);
   if (!ALLOWED_EXTENSIONS.includes(extension as (typeof ALLOWED_EXTENSIONS)[number])) {
     return {
       valid: false,
