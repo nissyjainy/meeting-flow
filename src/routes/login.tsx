@@ -10,7 +10,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { loginFn, signupFn } from "@/lib/auth/server";
-import { buildOAuthRedirectUrl, normalizeAuthRedirectPath } from "@/lib/auth/redirect-path";
+import {
+  buildOAuthRedirectUrl,
+  isServerHandledAuthPath,
+  normalizeAuthRedirectPath,
+} from "@/lib/auth/redirect-path";
 import { createClient } from "@/lib/supabase/client";
 import { pageTitle, PRODUCT_NAME } from "@/lib/branding";
 
@@ -68,8 +72,13 @@ export function AuthShell({
         toast.error(result.message);
         return;
       }
+      const next = normalizeAuthRedirectPath(redirectTo);
+      if (isServerHandledAuthPath(next)) {
+        window.location.assign(next);
+        return;
+      }
       await router.invalidate();
-      await router.navigate({ to: normalizeAuthRedirectPath(redirectTo) });
+      await router.navigate({ to: next });
     },
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : "Something went wrong");

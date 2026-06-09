@@ -34,22 +34,6 @@
         padding: 10px;
         margin-bottom: 10px;
       }
-      label {
-        display: block;
-        margin-bottom: 4px;
-        color: #bdc1c6;
-        font-size: 11px;
-      }
-      input {
-        width: 100%;
-        box-sizing: border-box;
-        margin-bottom: 8px;
-        padding: 7px 8px;
-        border-radius: 8px;
-        border: 1px solid #3c4043;
-        background: #0f1115;
-        color: #e8eaed;
-      }
       button {
         width: 100%;
         border: none;
@@ -140,34 +124,21 @@
       .mic-checking {
         color: #fdd663;
       }
+      .signed-in-email {
+        margin: 0 0 10px;
+        font-size: 12px;
+        color: #bdc1c6;
+      }
     </style>
   </head>
   <body>
     <h1>MeetFlow Capture</h1>
     <p class="sub">Record Google Meet tab audio plus your microphone and upload to MeetFlow.</p>
 
-    <section id="setup-section" class="card hidden">
-      <label for="meetflow-url">MeetFlow URL</label>
-      <input id="meetflow-url" type="url" placeholder="https://meeting-flow.nisargjain.workers.dev" />
-
-      <label for="supabase-url">Supabase URL</label>
-      <input id="supabase-url" type="url" placeholder="https://your-project.supabase.co" />
-
-      <label for="supabase-key">Supabase publishable key</label>
-      <input id="supabase-key" type="password" placeholder="sb_publishable_… or anon key" />
-
-      <button id="save-config-btn" class="primary" type="button">Save settings</button>
-    </section>
-
     <section id="auth-section" class="card hidden">
-      <label for="email">MeetFlow email</label>
-      <input id="email" type="email" autocomplete="username" />
-
-      <label for="password">Password</label>
-      <input id="password" type="password" autocomplete="current-password" />
-
-      <button id="sign-in-btn" class="primary" type="button">Sign in</button>
-      <button id="sign-out-btn" class="ghost" type="button">Sign out</button>
+      <p id="signed-in-email" class="signed-in-email hidden"></p>
+      <button id="sign-in-btn" class="primary" type="button">Sign in with MeetFlow</button>
+      <button id="sign-out-btn" class="ghost hidden" type="button">Sign out</button>
     </section>
 
     <section id="capture-section" class="card hidden">

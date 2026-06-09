@@ -14,6 +14,7 @@ import { Route as LogoutRouteImport } from './routes/logout'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AppIndexRouteImport } from './routes/_app.index'
+import { Route as ExtensionAuthRouteImport } from './routes/extension.auth'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as AppTeamInsightsRouteImport } from './routes/_app.team-insights'
 import { Route as AppTeamRouteImport } from './routes/_app.team'
@@ -34,6 +35,8 @@ import { Route as AppMeetingsIdRouteImport } from './routes/_app.meetings.$id'
 import { Route as ApiIntegrationsGoogleDisconnectRouteImport } from './routes/api.integrations.google.disconnect'
 import { Route as ApiIntegrationsGoogleConnectRouteImport } from './routes/api.integrations.google.connect'
 import { Route as ApiIntegrationsGoogleCallbackRouteImport } from './routes/api.integrations.google.callback'
+import { Route as ApiExtensionAuthRefreshRouteImport } from './routes/api.extension.auth.refresh'
+import { Route as ApiExtensionAuthExchangeRouteImport } from './routes/api.extension.auth.exchange'
 import { Route as AppMeetingsScheduledIdRouteImport } from './routes/_app.meetings.scheduled.$id'
 
 const SignupRoute = SignupRouteImport.update({
@@ -59,6 +62,11 @@ const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AppRoute,
+} as any)
+const ExtensionAuthRoute = ExtensionAuthRouteImport.update({
+  id: '/extension/auth',
+  path: '/extension/auth',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthCallbackRoute = AuthCallbackRouteImport.update({
   id: '/auth/callback',
@@ -164,6 +172,17 @@ const ApiIntegrationsGoogleCallbackRoute =
     path: '/api/integrations/google/callback',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiExtensionAuthRefreshRoute = ApiExtensionAuthRefreshRouteImport.update({
+  id: '/api/extension/auth/refresh',
+  path: '/api/extension/auth/refresh',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiExtensionAuthExchangeRoute =
+  ApiExtensionAuthExchangeRouteImport.update({
+    id: '/api/extension/auth/exchange',
+    path: '/api/extension/auth/exchange',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AppMeetingsScheduledIdRoute = AppMeetingsScheduledIdRouteImport.update({
   id: '/scheduled/$id',
   path: '/scheduled/$id',
@@ -185,6 +204,7 @@ export interface FileRoutesByFullPath {
   '/team': typeof AppTeamRoute
   '/team-insights': typeof AppTeamInsightsRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/extension/auth': typeof ExtensionAuthRoute
   '/meetings/$id': typeof AppMeetingsIdRoute
   '/api/cron/task-reminders': typeof ApiCronTaskRemindersRoute
   '/api/extension/meeting-upload': typeof ApiExtensionMeetingUploadRoute
@@ -193,6 +213,8 @@ export interface FileRoutesByFullPath {
   '/api/health/supabase': typeof ApiHealthSupabaseRoute
   '/meetings/': typeof AppMeetingsIndexRoute
   '/meetings/scheduled/$id': typeof AppMeetingsScheduledIdRoute
+  '/api/extension/auth/exchange': typeof ApiExtensionAuthExchangeRoute
+  '/api/extension/auth/refresh': typeof ApiExtensionAuthRefreshRoute
   '/api/integrations/google/callback': typeof ApiIntegrationsGoogleCallbackRoute
   '/api/integrations/google/connect': typeof ApiIntegrationsGoogleConnectRoute
   '/api/integrations/google/disconnect': typeof ApiIntegrationsGoogleDisconnectRoute
@@ -210,6 +232,7 @@ export interface FileRoutesByTo {
   '/team': typeof AppTeamRoute
   '/team-insights': typeof AppTeamInsightsRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/extension/auth': typeof ExtensionAuthRoute
   '/': typeof AppIndexRoute
   '/meetings/$id': typeof AppMeetingsIdRoute
   '/api/cron/task-reminders': typeof ApiCronTaskRemindersRoute
@@ -219,6 +242,8 @@ export interface FileRoutesByTo {
   '/api/health/supabase': typeof ApiHealthSupabaseRoute
   '/meetings': typeof AppMeetingsIndexRoute
   '/meetings/scheduled/$id': typeof AppMeetingsScheduledIdRoute
+  '/api/extension/auth/exchange': typeof ApiExtensionAuthExchangeRoute
+  '/api/extension/auth/refresh': typeof ApiExtensionAuthRefreshRoute
   '/api/integrations/google/callback': typeof ApiIntegrationsGoogleCallbackRoute
   '/api/integrations/google/connect': typeof ApiIntegrationsGoogleConnectRoute
   '/api/integrations/google/disconnect': typeof ApiIntegrationsGoogleDisconnectRoute
@@ -239,6 +264,7 @@ export interface FileRoutesById {
   '/_app/team': typeof AppTeamRoute
   '/_app/team-insights': typeof AppTeamInsightsRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/extension/auth': typeof ExtensionAuthRoute
   '/_app/': typeof AppIndexRoute
   '/_app/meetings/$id': typeof AppMeetingsIdRoute
   '/api/cron/task-reminders': typeof ApiCronTaskRemindersRoute
@@ -248,6 +274,8 @@ export interface FileRoutesById {
   '/api/health/supabase': typeof ApiHealthSupabaseRoute
   '/_app/meetings/': typeof AppMeetingsIndexRoute
   '/_app/meetings/scheduled/$id': typeof AppMeetingsScheduledIdRoute
+  '/api/extension/auth/exchange': typeof ApiExtensionAuthExchangeRoute
+  '/api/extension/auth/refresh': typeof ApiExtensionAuthRefreshRoute
   '/api/integrations/google/callback': typeof ApiIntegrationsGoogleCallbackRoute
   '/api/integrations/google/connect': typeof ApiIntegrationsGoogleConnectRoute
   '/api/integrations/google/disconnect': typeof ApiIntegrationsGoogleDisconnectRoute
@@ -269,6 +297,7 @@ export interface FileRouteTypes {
     | '/team'
     | '/team-insights'
     | '/auth/callback'
+    | '/extension/auth'
     | '/meetings/$id'
     | '/api/cron/task-reminders'
     | '/api/extension/meeting-upload'
@@ -277,6 +306,8 @@ export interface FileRouteTypes {
     | '/api/health/supabase'
     | '/meetings/'
     | '/meetings/scheduled/$id'
+    | '/api/extension/auth/exchange'
+    | '/api/extension/auth/refresh'
     | '/api/integrations/google/callback'
     | '/api/integrations/google/connect'
     | '/api/integrations/google/disconnect'
@@ -294,6 +325,7 @@ export interface FileRouteTypes {
     | '/team'
     | '/team-insights'
     | '/auth/callback'
+    | '/extension/auth'
     | '/'
     | '/meetings/$id'
     | '/api/cron/task-reminders'
@@ -303,6 +335,8 @@ export interface FileRouteTypes {
     | '/api/health/supabase'
     | '/meetings'
     | '/meetings/scheduled/$id'
+    | '/api/extension/auth/exchange'
+    | '/api/extension/auth/refresh'
     | '/api/integrations/google/callback'
     | '/api/integrations/google/connect'
     | '/api/integrations/google/disconnect'
@@ -322,6 +356,7 @@ export interface FileRouteTypes {
     | '/_app/team'
     | '/_app/team-insights'
     | '/auth/callback'
+    | '/extension/auth'
     | '/_app/'
     | '/_app/meetings/$id'
     | '/api/cron/task-reminders'
@@ -331,6 +366,8 @@ export interface FileRouteTypes {
     | '/api/health/supabase'
     | '/_app/meetings/'
     | '/_app/meetings/scheduled/$id'
+    | '/api/extension/auth/exchange'
+    | '/api/extension/auth/refresh'
     | '/api/integrations/google/callback'
     | '/api/integrations/google/connect'
     | '/api/integrations/google/disconnect'
@@ -342,11 +379,14 @@ export interface RootRouteChildren {
   LogoutRoute: typeof LogoutRoute
   SignupRoute: typeof SignupRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
+  ExtensionAuthRoute: typeof ExtensionAuthRoute
   ApiCronTaskRemindersRoute: typeof ApiCronTaskRemindersRoute
   ApiExtensionMeetingUploadRoute: typeof ApiExtensionMeetingUploadRoute
   ApiHealthGoogleOauthRoute: typeof ApiHealthGoogleOauthRoute
   ApiHealthMeetingsSchemaRoute: typeof ApiHealthMeetingsSchemaRoute
   ApiHealthSupabaseRoute: typeof ApiHealthSupabaseRoute
+  ApiExtensionAuthExchangeRoute: typeof ApiExtensionAuthExchangeRoute
+  ApiExtensionAuthRefreshRoute: typeof ApiExtensionAuthRefreshRoute
   ApiIntegrationsGoogleCallbackRoute: typeof ApiIntegrationsGoogleCallbackRoute
   ApiIntegrationsGoogleConnectRoute: typeof ApiIntegrationsGoogleConnectRoute
   ApiIntegrationsGoogleDisconnectRoute: typeof ApiIntegrationsGoogleDisconnectRoute
@@ -388,6 +428,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/extension/auth': {
+      id: '/extension/auth'
+      path: '/extension/auth'
+      fullPath: '/extension/auth'
+      preLoaderRoute: typeof ExtensionAuthRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/auth/callback': {
       id: '/auth/callback'
@@ -529,6 +576,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiIntegrationsGoogleCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/extension/auth/refresh': {
+      id: '/api/extension/auth/refresh'
+      path: '/api/extension/auth/refresh'
+      fullPath: '/api/extension/auth/refresh'
+      preLoaderRoute: typeof ApiExtensionAuthRefreshRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/extension/auth/exchange': {
+      id: '/api/extension/auth/exchange'
+      path: '/api/extension/auth/exchange'
+      fullPath: '/api/extension/auth/exchange'
+      preLoaderRoute: typeof ApiExtensionAuthExchangeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/meetings/scheduled/$id': {
       id: '/_app/meetings/scheduled/$id'
       path: '/scheduled/$id'
@@ -589,11 +650,14 @@ const rootRouteChildren: RootRouteChildren = {
   LogoutRoute: LogoutRoute,
   SignupRoute: SignupRoute,
   AuthCallbackRoute: AuthCallbackRoute,
+  ExtensionAuthRoute: ExtensionAuthRoute,
   ApiCronTaskRemindersRoute: ApiCronTaskRemindersRoute,
   ApiExtensionMeetingUploadRoute: ApiExtensionMeetingUploadRoute,
   ApiHealthGoogleOauthRoute: ApiHealthGoogleOauthRoute,
   ApiHealthMeetingsSchemaRoute: ApiHealthMeetingsSchemaRoute,
   ApiHealthSupabaseRoute: ApiHealthSupabaseRoute,
+  ApiExtensionAuthExchangeRoute: ApiExtensionAuthExchangeRoute,
+  ApiExtensionAuthRefreshRoute: ApiExtensionAuthRefreshRoute,
   ApiIntegrationsGoogleCallbackRoute: ApiIntegrationsGoogleCallbackRoute,
   ApiIntegrationsGoogleConnectRoute: ApiIntegrationsGoogleConnectRoute,
   ApiIntegrationsGoogleDisconnectRoute: ApiIntegrationsGoogleDisconnectRoute,

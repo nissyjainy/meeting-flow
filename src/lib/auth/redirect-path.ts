@@ -29,6 +29,11 @@ export function normalizeAuthRedirectPath(redirect?: string | null): string {
 }
 
 /** Build the Supabase OAuth redirect URL — must hit /auth/callback to exchange the PKCE code. */
+/** Server-handled routes (not SPA pages) that require a full document navigation after login. */
+export function isServerHandledAuthPath(path: string): boolean {
+  return path.startsWith("/extension/");
+}
+
 export function buildOAuthRedirectUrl(origin: string, finalRedirectPath?: string | null): string {
   const base = origin.replace(/\/$/, "");
   const callback = new URL("/auth/callback", base);

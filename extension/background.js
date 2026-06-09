@@ -5,8 +5,6 @@ const LOG_PREFIX = "[meetflow-capture]";
 
 const DEFAULT_CONFIG = {
   meetflowUrl: "https://meeting-flow.nisargjain.workers.dev",
-  supabaseUrl: "",
-  supabaseKey: "",
 };
 
 const IDLE_CAPTURE_STATE = {
@@ -53,9 +51,13 @@ async function getConfig() {
 
 async function getSession() {
   const stored = await extensionStorageGet(["authSession", "extensionConfig"], "background");
+  const config = {
+    meetflowUrl:
+      stored.extensionConfig?.meetflowUrl?.trim() || DEFAULT_CONFIG.meetflowUrl,
+  };
   return {
     session: stored.authSession ?? null,
-    config: { ...DEFAULT_CONFIG, ...(stored.extensionConfig ?? {}) },
+    config,
   };
 }
 
@@ -74,25 +76,25 @@ async function refreshAuthToken(config, session) {
   if (!session?.refreshToken) return session;
   if (session.expiresAt && session.expiresAt > Date.now() + 60_000) return session;
 
-  const res = await fetch(`${config.supabaseUrl.replace(/\/$/, "")}/auth/v1/token?grant_type=refresh_token`, {
+  const meetflowUrl = (config.meetflowUrl ?? DEFAULT_CONFIG.meetflowUrl).replace(/\/$/, "");
+  const res = await fetch(`${meetflowUrl}/api/extension/auth/refresh`, {
     method: "POST",
-    headers: {
-      apikey: config.supabaseKey,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ refresh_token: session.refreshToken }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refreshToken: session.refreshToken }),
   });
 
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(body.error_description || "Session expired. Sign in again.");
+    throw new Error(body.error || "Session expired. Sign in again.");
   }
 
   const next = {
     ...session,
-    accessToken: body.access_token,
-    refreshToken: body.refresh_token ?? session.refreshToken,
-    expiresAt: Date.now() + (body.expires_in ?? 3600) * 1000,
+    accessToken: body.accessToken,
+    refreshToken: body.refreshToken ?? session.refreshToken,
+    userId: body.userId ?? session.userId,
+    email: body.email ?? session.email,
+    expiresAt: body.expiresAt ?? Date.now() + 3600 * 1000,
   };
   await extensionStorageSet({ authSession: next }, "background");
   return next;

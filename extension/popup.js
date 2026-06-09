@@ -2,8 +2,10 @@ const LOG_PREFIX = "[meetflow-capture]";
 
 const $ = (id) => document.getElementById(id);
 
-const setupSection = $("setup-section");
 const authSection = $("auth-section");
+const signedInEmailEl = $("signed-in-email");
+const signInBtn = $("sign-in-btn");
+const signOutBtn = $("sign-out-btn");
 const captureSection = $("capture-section");
 const recordingsSection = $("recordings-section");
 
@@ -174,15 +176,8 @@ async function getConfig() {
 }
 
 async function getSession() {
-  const stored = await extensionStorageGet(["authSession", "extensionConfig"], "popup");
-  return {
-    session: stored.authSession ?? null,
-    config: stored.extensionConfig ?? {},
-  };
-}
-
-async function saveConfig(config) {
-  await extensionStorageSet({ extensionConfig: config }, "popup");
+  const stored = await extensionStorageGet(["authSession"], "popup");
+  return { session: stored.authSession ?? null };
 }
 
 async function saveSession(session) {
@@ -193,15 +188,90 @@ async function clearSession() {
   await extensionStorageRemove(["authSession"], "popup");
 }
 
-function needsSetup(config) {
-  return !config.meetflowUrl?.trim() || !config.supabaseUrl?.trim() || !config.supabaseKey?.trim();
-}
-
-function showSections({ setup, auth, capture, recordings }) {
-  setupSection.classList.toggle("hidden", !setup);
+function showSections({ auth, capture, recordings }) {
   authSection.classList.toggle("hidden", !auth);
   captureSection.classList.toggle("hidden", !capture);
   recordingsSection.classList.toggle("hidden", !recordings);
+}
+
+function updateAuthControls(session) {
+  const signedIn = Boolean(session?.accessToken);
+  signInBtn.classList.toggle("hidden", signedIn);
+  signOutBtn.classList.toggle("hidden", !signedIn);
+  if (signedIn && session.email) {
+    signedInEmailEl.textContent = `Signed in as ${session.email}`;
+    signedInEmailEl.classList.remove("hidden");
+  } else {
+    signedInEmailEl.textContent = "";
+    signedInEmailEl.classList.add("hidden");
+  }
+}
+
+async function signInWithMeetFlow() {
+  const config = await getConfig();
+  const meetflowUrl = (config.meetflowUrl ?? "").replace(/\/$/, "");
+  if (!meetflowUrl) {
+    setCaptureStatus("MeetFlow URL is not configured.");
+    return;
+  }
+
+  if (!chrome.identity?.launchWebAuthFlow) {
+    setCaptureStatus("Chrome identity API is unavailable in this browser.");
+    return;
+  }
+
+  setCaptureStatus("Opening MeetFlow sign in…");
+  signInBtn.disabled = true;
+
+  try {
+    const redirectUri = chrome.identity.getRedirectURL();
+    const authUrl = `${meetflowUrl}/extension/auth?redirect_uri=${encodeURIComponent(redirectUri)}`;
+
+    const responseUrl = await new Promise((resolve, reject) => {
+      chrome.identity.launchWebAuthFlow({ url: authUrl, interactive: true }, (url) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+        if (!url) {
+          reject(new Error("MeetFlow sign in was cancelled."));
+          return;
+        }
+        resolve(url);
+      });
+    });
+
+    const code = new URL(responseUrl).searchParams.get("code");
+    if (!code) {
+      throw new Error("MeetFlow sign in did not return an authorization code.");
+    }
+
+    const res = await fetch(`${meetflowUrl}/api/extension/auth/exchange`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(body.error || "MeetFlow sign in failed.");
+    }
+
+    await saveSession({
+      accessToken: body.accessToken,
+      refreshToken: body.refreshToken,
+      userId: body.userId ?? null,
+      email: body.email ?? "",
+      expiresAt: body.expiresAt ?? Date.now() + 3600 * 1000,
+    });
+
+    setCaptureStatus("Signed in with MeetFlow.");
+    await initUi();
+  } catch (error) {
+    logError("signInWithMeetFlow failed", error);
+    setCaptureStatus(error instanceof Error ? error.message : "MeetFlow sign in failed.");
+  } finally {
+    signInBtn.disabled = false;
+  }
 }
 
 async function syncCaptureControls() {
@@ -291,45 +361,6 @@ async function refreshRecordings() {
   }
 }
 
-async function signIn() {
-  const { config } = await getSession();
-  const email = $("email").value.trim();
-  const password = $("password").value;
-
-  if (!email || !password) {
-    setCaptureStatus("Enter email and password.");
-    return;
-  }
-
-  setCaptureStatus("Signing in…");
-  const res = await fetch(`${config.supabaseUrl.replace(/\/$/, "")}/auth/v1/token?grant_type=password`, {
-    method: "POST",
-    headers: {
-      apikey: config.supabaseKey,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ email, password }),
-  });
-
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    setCaptureStatus(body.error_description || body.msg || body.message || "Sign in failed.");
-    return;
-  }
-
-  await saveSession({
-    accessToken: body.access_token,
-    refreshToken: body.refresh_token,
-    userId: body.user?.id ?? null,
-    email,
-    expiresAt: Date.now() + (body.expires_in ?? 3600) * 1000,
-  });
-
-  $("password").value = "";
-  setCaptureStatus("Signed in.");
-  await initUi();
-}
-
 async function signOut() {
   await clearSession();
   setCaptureStatus("Signed out.");
@@ -407,49 +438,28 @@ async function resetExtensionState() {
 }
 
 async function initUi() {
-  const config = await getConfig();
   const { session } = await getSession();
-
-  $("meetflow-url").value = config.meetflowUrl ?? "";
-  $("supabase-url").value = config.supabaseUrl ?? "";
-  $("supabase-key").value = config.supabaseKey ?? "";
-
-  if (needsSetup(config)) {
-    showSections({ setup: true, auth: false, capture: false, recordings: false });
-    return;
-  }
+  updateAuthControls(session);
 
   if (!session?.accessToken) {
-    showSections({ setup: false, auth: true, capture: false, recordings: true });
-    setCaptureStatus("Sign in to record and upload.");
+    showSections({ auth: true, capture: false, recordings: true });
+    setCaptureStatus("Sign in with MeetFlow to record and upload.");
     await refreshRecordings();
     return;
   }
 
-  showSections({ setup: false, auth: true, capture: true, recordings: true });
-  $("email").value = session.email ?? "";
+  showSections({ auth: true, capture: true, recordings: true });
   if (!captureStatusEl.textContent) {
-    setCaptureStatus(session.email ? `Signed in as ${session.email}` : "Signed in.");
+    setCaptureStatus(session.email ? `Signed in as ${session.email}` : "Signed in with MeetFlow.");
   }
   await Promise.all([refreshMeetTabStatus(), refreshMicPermissionStatus(), refreshRecordings()]);
 }
 
-$("save-config-btn").addEventListener("click", async () => {
-  const config = {
-    meetflowUrl: $("meetflow-url").value.trim(),
-    supabaseUrl: $("supabase-url").value.trim(),
-    supabaseKey: $("supabase-key").value.trim(),
-  };
-  await saveConfig(config);
-  setCaptureStatus("Settings saved.");
-  await initUi();
+signInBtn.addEventListener("click", () => {
+  void signInWithMeetFlow();
 });
 
-$("sign-in-btn").addEventListener("click", () => {
-  void signIn();
-});
-
-$("sign-out-btn").addEventListener("click", () => {
+signOutBtn.addEventListener("click", () => {
   void signOut();
 });
 
