@@ -1,14 +1,23 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { MEETINGS_BUCKET } from "./constants";
+import { findCalendarEventTitleForCapture } from "./find-calendar-event-for-capture.server";
 import { enrichMeetingRecord } from "./record";
 import type { MeetingRecord } from "./types";
 import { buildMeetingStoragePath } from "./storage";
 import { uploadDebug, uploadDebugError } from "./upload-debug";
 import { normalizeMeetingMimeType, validateMeetingFile } from "./validation";
+import {
+  resolveCaptureMeetingCode,
+  resolveCaptureTitle,
+  resolveMeetingPlatform,
+} from "./resolve-capture-title";
 
 export type CaptureUploadMetadata = {
   meetUrl?: string | null;
   meetTitle?: string | null;
+  tabTitle?: string | null;
+  platform?: string | null;
+  meetingCode?: string | null;
   source?: "chrome_extension";
 };
 
@@ -49,6 +58,31 @@ export async function uploadCapturedMeetingRecording(
   const meetingId = crypto.randomUUID();
   const storagePath = buildMeetingStoragePath(userId, meetingId, file.name);
 
+  const meetUrl = metadata.meetUrl?.trim() || null;
+  const meetingCode = resolveCaptureMeetingCode(metadata.meetingCode, meetUrl);
+  const platform = resolveMeetingPlatform(meetUrl, metadata.platform);
+  const calendarTitle = await findCalendarEventTitleForCapture(supabase, userId, {
+    meetUrl,
+    meetingCode,
+  });
+  const title = resolveCaptureTitle({
+    calendarTitle,
+    tabTitle: metadata.tabTitle ?? metadata.meetTitle,
+    meetTitle: metadata.meetTitle,
+    meetingCode,
+    meetUrl,
+    platform,
+  });
+
+  uploadDebug("capture title resolved", {
+    title,
+    platform,
+    meetingCode,
+    meetUrl,
+    calendarTitle,
+    tabTitle: metadata.tabTitle ?? metadata.meetTitle ?? null,
+  });
+
   const { error: storageError } = await supabase.storage.from(MEETINGS_BUCKET).upload(storagePath, file, {
     contentType: normalizeMeetingMimeType(file.type, file.name),
     upsert: false,
@@ -67,8 +101,14 @@ export async function uploadCapturedMeetingRecording(
       file_url: storagePath,
       transcript: null,
       status: "processing",
+      title,
+      platform,
+      meeting_url: meetUrl,
+      meeting_code: meetingCode,
     })
-    .select("id,file_name,file_url,transcript,summary,status,transcript_error,created_at")
+    .select(
+      "id,file_name,file_url,transcript,summary,status,transcript_error,created_at,title,platform,meeting_url,meeting_code",
+    )
     .single();
 
   if (insertError) {
@@ -91,8 +131,11 @@ export async function uploadCapturedMeetingRecording(
       meetingId,
       fileName: file.name,
       capturedAt,
-      meetUrl: metadata.meetUrl ?? null,
-      meetTitle: metadata.meetTitle ?? null,
+      meetUrl,
+      meetTitle: title,
+      tabTitle: metadata.tabTitle ?? metadata.meetTitle ?? null,
+      platform: metadata.platform ?? null,
+      meetingCode,
     },
   };
 

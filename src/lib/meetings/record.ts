@@ -17,7 +17,7 @@ export function enrichMeetingRecord(row: MeetingRecordRow): MeetingRecord {
     ...row,
     summary: row.summary ?? null,
     status: uiStatus,
-    title: titleFromFileName(row.file_name),
+    title: row.title?.trim() || titleFromFileName(row.file_name),
     mime_type: mimeTypeFromFileName(row.file_name),
     file_path: row.file_url,
     transcript_text: row.transcript,

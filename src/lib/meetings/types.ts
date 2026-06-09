@@ -8,11 +8,18 @@ export type MeetingRecordRow = {
   status: string | null;
   transcript_error?: string | null;
   created_at: string;
+  title?: string | null;
+  platform?: string | null;
+  meeting_url?: string | null;
+  meeting_code?: string | null;
 };
 
 /** Enriched record used by existing UI components. */
 export type MeetingRecord = MeetingRecordRow & {
   title: string;
+  platform?: string | null;
+  meeting_url?: string | null;
+  meeting_code?: string | null;
   /** UI status; maps DB `completed` → `ready` */
   status: "processing" | "ready" | "failed";
   mime_type: string;

@@ -59,12 +59,18 @@ export const Route = createFileRoute("/api/extension/meeting-upload")({
 
         const meetUrl = String(formData.get("meetUrl") ?? "").trim() || null;
         const meetTitle = String(formData.get("meetTitle") ?? "").trim() || null;
+        const tabTitle = String(formData.get("tabTitle") ?? "").trim() || meetTitle;
+        const platform = String(formData.get("platform") ?? "").trim() || null;
+        const meetingCode = String(formData.get("meetingCode") ?? "").trim() || null;
 
         console.info("[extension-upload] uploading", {
           userId: user.id,
           fileName: file.name,
           bytes: file.size,
           meetUrl,
+          tabTitle,
+          platform,
+          meetingCode,
         });
 
         try {
@@ -75,6 +81,9 @@ export const Route = createFileRoute("/api/extension/meeting-upload")({
             metadata: {
               meetUrl,
               meetTitle,
+              tabTitle,
+              platform,
+              meetingCode,
               source: "chrome_extension",
             },
           });
@@ -95,6 +104,8 @@ export const Route = createFileRoute("/api/extension/meeting-upload")({
             storagePath: result.storagePath,
             meetUrl: result.metadata.meetUrl,
             meetTitle: result.metadata.meetTitle,
+            platform: result.meeting.platform ?? result.metadata.platform,
+            meetingCode: result.metadata.meetingCode,
             capturedAt: result.metadata.capturedAt,
             viewUrl: `${origin}/meetings/${result.meeting.id}`,
             message: "Upload complete. Transcription started in MeetFlow.",

@@ -454,6 +454,8 @@ async function startCapture() {
     tabId: activeMeeting.tabId,
     meetUrl: activeMeeting.meetUrl,
     meetCode: activeMeeting.meetCode,
+    tabTitle: activeMeeting.title,
+    platform: activeMeeting.platform,
     title: activeMeeting.title,
   });
   if (!res?.ok) {

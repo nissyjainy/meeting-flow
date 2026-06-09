@@ -1,4 +1,4 @@
-importScripts("storage.js", "upload-bytes.js", "meeting-platform.js");
+importScripts("storage.js", "upload-bytes.js", "meeting-platform.js", "meeting-metadata.js");
 
 const LOG_PREFIX = "[meetflow-capture]";
 
@@ -100,7 +100,19 @@ async function sendToOffscreen(message) {
   return chrome.runtime.sendMessage(message);
 }
 
-async function uploadRecordingInBackground({ arrayBuffer, mimeType, fileName, meetUrl, meetTitle, bytes, diagnostics }) {
+async function uploadRecordingInBackground({
+  arrayBuffer,
+  mimeType,
+  fileName,
+  meetUrl,
+  meetTitle,
+  tabTitle,
+  platform,
+  meetingCode,
+  meetCode,
+  bytes,
+  diagnostics,
+}) {
   log("background upload started", { fileName, bytes });
 
   const { config, session: initialSession } = await getSession();
@@ -115,8 +127,13 @@ async function uploadRecordingInBackground({ arrayBuffer, mimeType, fileName, me
   const formData = new FormData();
   formData.append("file", file);
   formData.append("fileName", fileName);
-  if (meetUrl) formData.append("meetUrl", meetUrl);
-  if (meetTitle) formData.append("meetTitle", meetTitle);
+  appendCaptureMetadata(formData, {
+    meetUrl,
+    tabTitle: tabTitle ?? meetTitle,
+    meetTitle,
+    platform,
+    meetCode: meetingCode ?? meetCode,
+  });
 
   const uploadUrl = `${config.meetflowUrl.replace(/\/$/, "")}/api/extension/meeting-upload`;
   if (reportedBytes != null && file.size !== reportedBytes) {

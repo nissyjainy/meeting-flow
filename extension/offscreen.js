@@ -154,8 +154,13 @@ async function uploadRecordingBlob({ blob, fileName, meetUrl, meetTitle, diagnos
   const formData = new FormData();
   formData.append("file", file);
   formData.append("fileName", fileName);
-  if (meetUrl) formData.append("meetUrl", meetUrl);
-  if (meetTitle) formData.append("meetTitle", meetTitle);
+  appendCaptureMetadata(formData, {
+    meetUrl,
+    tabTitle: meetMeta?.tabTitle ?? meetTitle,
+    meetTitle,
+    platform: meetMeta?.platform,
+    meetCode: meetMeta?.meetCode,
+  });
 
   log("upload POST from offscreen", {
     fileName,
@@ -203,8 +208,9 @@ async function beginRecording(message) {
 
   meetMeta = {
     meetUrl: message.meetUrl ?? null,
-    meetTitle: message.title ?? null,
+    tabTitle: message.tabTitle ?? message.title ?? null,
     meetCode: message.meetCode ?? null,
+    platform: message.platform ?? null,
     tabId: message.tabId ?? null,
   };
 
@@ -296,7 +302,7 @@ async function endRecording() {
 
   const fileName = buildFileName(meetMeta?.meetCode ?? null);
   const meetUrl = meetMeta?.meetUrl ?? null;
-  const meetTitle = meetMeta?.meetTitle ?? null;
+  const meetTitle = meetMeta?.tabTitle ?? null;
   cleanup();
 
   if (blob.size < MIN_RECORDING_BYTES) {

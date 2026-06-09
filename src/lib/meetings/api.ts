@@ -16,7 +16,7 @@ import { MEETINGS_BUCKET } from "./constants";
 import { uploadDebug, uploadDebugError, uploadDebugReturn } from "./upload-debug";
 
 const MEETING_COLUMNS =
-  "id,file_name,file_url,transcript,summary,status,transcript_error,created_at";
+  "id,file_name,file_url,transcript,summary,status,transcript_error,created_at,title,platform,meeting_url,meeting_code";
 
 export async function listMeetingTasks(meetingId: string): Promise<MeetingTaskRecord[]> {
   const supabase = createClient();
