@@ -164,6 +164,20 @@ export async function runTranscribeMeeting(
     throw new Error(saveError.message);
   }
 
+  try {
+    const { indexMeetingTranscriptChunks } = await import("./meeting-chunks-index.server");
+    const indexOutcome = await indexMeetingTranscriptChunks(supabase, meeting.id, transcript);
+    transcriptionLog("meeting chunks index finished", {
+      meetingId: meeting.id,
+      indexed: indexOutcome.indexed,
+      chunkCount: indexOutcome.chunkCount,
+    });
+  } catch (indexError) {
+    transcriptionError("meeting chunks index threw (non-fatal)", indexError, {
+      meetingId: meeting.id,
+    });
+  }
+
   transcriptionLog("runTranscribeMeeting success", { meetingId: meeting.id });
   return { transcript };
 }

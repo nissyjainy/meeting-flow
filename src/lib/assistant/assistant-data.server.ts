@@ -7,7 +7,7 @@ import { assistantLog } from "./assistant-debug";
 import type { AssistantCorpus, AssistantMeetingRecord } from "./types";
 
 export const ASSISTANT_MEETING_COLUMNS =
-  "id,file_name,file_url,transcript,summary,status,created_at";
+  "id,file_name,file_url,transcript,summary,status,created_at,title";
 
 type MeetingRow = {
   id: string;
@@ -94,7 +94,7 @@ export async function loadAssistantCorpus(
     const meeting = enrichMeetingRecord(row);
     return {
       meetingId: meeting.id,
-      meetingTitle: titleFromFileName(meeting.file_name),
+      meetingTitle: resolveMeetingTitle(row, meeting.title),
       meetingDate: formatMeetingDate(meeting.created_at),
       createdAt: meeting.created_at,
       summary: meeting.summary,

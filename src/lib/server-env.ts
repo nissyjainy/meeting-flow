@@ -51,11 +51,20 @@ export type EnvResolution = {
 
 const workerEnvCache: Record<string, string> = {};
 
+type WorkersAiBinding = {
+  run: (model: string, inputs: Record<string, unknown>) => Promise<unknown>;
+};
+
+let workersAiBinding: WorkersAiBinding | null = null;
+
 /** Cloudflare bindings must be read by key; Object.entries(env) misses many secrets. */
 const WORKER_ENV_ALLOWLIST = [
   "GROQ_API_KEY",
   "GROQ_WHISPER_MODEL",
   "GROQ_CHAT_MODEL",
+  "EMBEDDING_MODEL",
+  "CLOUDFLARE_ACCOUNT_ID",
+  "CLOUDFLARE_API_TOKEN",
   "GOOGLE_CLIENT_ID",
   "GOOGLE_CLIENT_SECRET",
   "GOOGLE_OAUTH_REDIRECT_URI",
@@ -133,10 +142,19 @@ export function maskSecret(value: string | undefined): string {
   return `${value.slice(0, 4)}…${value.slice(-4)}`;
 }
 
+export function getWorkersAiBinding(): WorkersAiBinding | null {
+  return workersAiBinding;
+}
+
 export function bindWorkerEnv(env: unknown): void {
   if (!env || typeof env !== "object") return;
 
   const bindings = env as Record<string, unknown>;
+
+  const ai = bindings.AI;
+  if (ai && typeof ai === "object" && typeof (ai as WorkersAiBinding).run === "function") {
+    workersAiBinding = ai as WorkersAiBinding;
+  }
 
   for (const key of WORKER_ENV_ALLOWLIST) {
     const value = bindings[key];

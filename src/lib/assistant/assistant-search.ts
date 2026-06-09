@@ -119,9 +119,13 @@ const STOP_WORDS = new Set([
 export const DEFAULT_MAX_SEARCH_RESULTS = 8;
 const TRANSCRIPT_SNIPPET_RADIUS = 280;
 
-/** Pluggable retrieval — replace with vector/semantic search without changing the query pipeline. */
+/** Pluggable retrieval — keyword fallback when vector index is unavailable. */
 export interface AssistantSearchStrategy {
-  search(query: string, corpus: AssistantCorpus, limit?: number): AssistantSearchHit[];
+  search(
+    query: string,
+    corpus: AssistantCorpus,
+    limit?: number,
+  ): AssistantSearchHit[] | Promise<AssistantSearchHit[]>;
 }
 
 export function extractSearchTerms(query: string): string[] {
@@ -290,13 +294,12 @@ export class KeywordAssistantSearchStrategy implements AssistantSearchStrategy {
 
 export const defaultAssistantSearchStrategy = new KeywordAssistantSearchStrategy();
 
-export function searchRelevantMeetings(
+export async function searchRelevantMeetingsKeyword(
   query: string,
   corpus: AssistantCorpus,
-  strategy: AssistantSearchStrategy = defaultAssistantSearchStrategy,
   limit = DEFAULT_MAX_SEARCH_RESULTS,
-): AssistantSearchHit[] {
-  return strategy.search(query, corpus, limit);
+): Promise<AssistantSearchHit[]> {
+  return defaultAssistantSearchStrategy.search(query, corpus, limit);
 }
 
 /** When opened from a meeting page, keep that meeting in context even if keyword scores are low. */

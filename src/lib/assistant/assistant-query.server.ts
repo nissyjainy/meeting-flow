@@ -12,7 +12,7 @@ import {
 } from "./assistant-context.server";
 import { generateAssistantAnswer } from "./assistant-llm.server";
 import { assistantError, assistantLog } from "./assistant-debug";
-import { pinMeetingInSearchHits, searchRelevantMeetings } from "./assistant-search";
+import { retrieveAssistantMeetingHits } from "./assistant-retrieval.server";
 import type { AssistantQueryResult, AssistantSource } from "./types";
 
 const AssistantQueryInput = z.object({
@@ -89,10 +89,9 @@ export const askAssistantFn = createServerFn({ method: "POST" })
       };
     }
 
-    let hits = searchRelevantMeetings(query, corpus);
-    if (data.meetingId) {
-      hits = pinMeetingInSearchHits(data.meetingId, hits, corpus);
-    }
+    const hits = await retrieveAssistantMeetingHits(supabase, query, corpus, {
+      meetingId: data.meetingId ?? null,
+    });
     const sources = buildSources(hits, corpus);
     const analyticsContext = buildAssistantAnalyticsContext(workspace);
     const meetingContext = buildAssistantContextWindow(hits, corpus);

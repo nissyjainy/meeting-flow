@@ -39,9 +39,19 @@ function buildMeetingContextBlock(
     lines.push(`Summary:\n${truncate(meeting.summary, MAX_SUMMARY_CHARS)}`);
   }
 
-  const transcriptExcerpt = hit.transcriptSnippet ?? truncate(meeting.transcript, 700);
-  if (transcriptExcerpt) {
-    lines.push(`Transcript excerpt:\n${transcriptExcerpt}`);
+  if (hit.chunkSnippets?.length) {
+    const chunkBlocks = hit.chunkSnippets
+      .slice(0, 4)
+      .map(
+        (chunk) =>
+          `[Chunk ${chunk.chunkIndex + 1}, relevance ${chunk.score.toFixed(3)}]\n${truncate(chunk.text, 1200)}`,
+      );
+    lines.push(`Relevant transcript passages:\n${chunkBlocks.join("\n\n")}`);
+  } else {
+    const transcriptExcerpt = hit.transcriptSnippet ?? truncate(meeting.transcript, 700);
+    if (transcriptExcerpt) {
+      lines.push(`Transcript excerpt:\n${transcriptExcerpt}`);
+    }
   }
 
   lines.push(`Action items:\n${formatTasks(meeting)}`);

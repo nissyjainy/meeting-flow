@@ -30,6 +30,7 @@ import { useDashboardAnalytics } from "@/hooks/use-dashboard-analytics";
 import { useMeetingUploadTrigger } from "@/providers/meeting-upload-provider";
 import { cn } from "@/lib/utils";
 import { pageTitle } from "@/lib/branding";
+import { getTimeOfDayGreeting } from "@/lib/time-greeting";
 
 export const Route = createFileRoute("/_app/")({
   head: () => ({
@@ -75,6 +76,7 @@ function Dashboard() {
   const { data, isLoading, isError, refetch } = useDashboardAnalytics();
 
   const displayName = user ? greetingName(user.fullName, user.email) : "there";
+  const dynamicGreeting = getTimeOfDayGreeting();
   const execution = data?.execution;
   const openTaskCount = execution?.totalOpen ?? 0;
 
@@ -82,7 +84,7 @@ function Dashboard() {
     <div className="mx-auto min-w-0 max-w-7xl px-4 py-8 md:px-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight">Good morning, {displayName}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{dynamicGreeting}, {displayName}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {isLoading ? (
               "Loading your workspace…"

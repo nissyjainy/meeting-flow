@@ -25,12 +25,19 @@ export type AssistantCorpus = {
   userName: string | null;
 };
 
-/** Result from retrieval — swap keyword search for vector search later. */
+export type AssistantChunkSnippet = {
+  chunkIndex: number;
+  text: string;
+  score: number;
+};
+
+/** Result from retrieval (keyword or vector chunk matches). */
 export type AssistantSearchHit = {
   meetingId: string;
   score: number;
   matchedFields: string[];
   transcriptSnippet: string | null;
+  chunkSnippets?: AssistantChunkSnippet[];
 };
 
 export type AssistantSource = {
