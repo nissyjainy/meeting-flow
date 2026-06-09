@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "MeetFlow Meet Capture",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Capture Google Meet, Zoom, or Microsoft Teams tab audio plus microphone, mix, and upload to MeetFlow for transcription.",
   "permissions": ["tabCapture", "storage", "tabs", "activeTab", "offscreen", "identity"],
   "host_permissions": [
@@ -9,8 +9,11 @@
     "https://app.zoom.us/*",
     "https://zoom.us/*",
     "https://*.zoom.us/*",
+    "https://zoom.com/*",
+    "https://*.zoom.com/*",
     "https://teams.microsoft.com/*",
     "https://teams.live.com/*",
+    "https://teams.cloud.microsoft/*",
     "https://meeting-flow.nisargjain.workers.dev/*",
     "http://localhost:8080/*",
     "http://127.0.0.1:8080/*"

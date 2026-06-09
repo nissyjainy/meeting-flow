@@ -291,8 +291,27 @@ async function syncCaptureControls() {
   return state;
 }
 
+function resolveMeetingFromTab(tab, diag, source) {
+  if (!tab?.id || !diag?.detectedPlatform) {
+    return null;
+  }
+  const platform = getMeetingPlatformFromUrl(tab.url ?? "");
+  return {
+    tabId: tab.id,
+    meetUrl: tab.url ?? null,
+    meetCode: tab.url ? parseMeetingCode(tab.url) : null,
+    title: tab.title ?? null,
+    platform: diag.detectedPlatform,
+    platformLabel: platform?.label ?? diag.detectedPlatform,
+    source,
+  };
+}
+
 async function refreshMeetingTabStatus() {
-  const res = await sendMessage({ type: "GET_ACTIVE_MEET_TAB" });
+  const [popupActiveTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const popupActiveDiag = diagnoseMeetingUrl(popupActiveTab?.url ?? "");
+
+  const res = await sendMessage({ type: "GET_ACTIVE_MEETING_TAB" });
   if (!res?.ok) {
     meetStatusEl.innerHTML = '<span class="meet-bad">Could not read the active tab.</span>';
     startBtn.disabled = true;
@@ -300,28 +319,62 @@ async function refreshMeetingTabStatus() {
     return;
   }
 
-  const onMeeting = Boolean(res.onMeet || res.onMeeting);
-  activeMeeting = onMeeting
-    ? {
-        tabId: res.tabId,
-        meetUrl: res.meetUrl,
-        meetCode: res.meetCode,
-        title: res.title,
-        platform: res.platform ?? null,
-        platformLabel: res.platformLabel ?? null,
-      }
-    : null;
+  let meetingInfo =
+    resolveMeetingFromTab(
+      { id: res.tabId, url: res.meetUrl, title: res.title },
+      res.platform ? { detectedPlatform: res.platform } : null,
+      "background",
+    ) ?? null;
 
-  if (onMeeting) {
-    const label = res.platformLabel ?? "Meeting";
-    const code = res.meetCode ? ` (${res.meetCode})` : "";
+  if (!meetingInfo && popupActiveDiag.detectedPlatform) {
+    meetingInfo = resolveMeetingFromTab(popupActiveTab, popupActiveDiag, "popup_activeTab");
+    log("meeting detected via popup activeTab", { popupActiveDiag, backgroundRejected: res.diagnostics });
+  }
+
+  if (!meetingInfo && Array.isArray(res.diagnostics)) {
+    const detected = res.diagnostics.find((entry) => entry.detectedPlatform && entry.tabId);
+    if (detected) {
+      meetingInfo = resolveMeetingFromTab(
+        { id: detected.tabId, url: detected.url, title: detected.title },
+        detected,
+        "background_scan",
+      );
+    }
+  }
+
+  activeMeeting = meetingInfo;
+
+  if (meetingInfo) {
+    const label = meetingInfo.platformLabel ?? "Meeting";
+    const code = meetingInfo.meetCode ? ` (${meetingInfo.meetCode})` : "";
     meetStatusEl.innerHTML = `<span class="meet-ok">Platform: ${label}${code}</span>`;
     await syncCaptureControls();
-  } else {
-    meetStatusEl.innerHTML = `<span class="meet-bad">Open a meeting tab (${SUPPORTED_HOST_HINT}) and click this extension again.</span>`;
-    startBtn.disabled = true;
-    stopBtn.disabled = true;
+    return;
   }
+
+  log("meeting tab not detected", {
+    popupActiveTab: {
+      url: popupActiveTab?.url ?? null,
+      ...popupActiveDiag,
+    },
+    tabDiagnostics: res.diagnostics ?? [],
+  });
+
+  const rejectedSamples = (res.diagnostics ?? [])
+    .filter((entry) => entry.rejectedReason)
+    .slice(0, 3)
+    .map((entry) => `${entry.hostname ?? "no-host"}: ${entry.rejectedReason}`);
+
+  const rejectionHint =
+    rejectedSamples.length > 0
+      ? `<br><span class="meet-bad">Rejected: ${rejectedSamples.join("; ")}</span>`
+      : popupActiveDiag.rejectedReason
+        ? `<br><span class="meet-bad">Active tab: ${popupActiveDiag.rejectedReason}</span>`
+        : "";
+
+  meetStatusEl.innerHTML = `<span class="meet-bad">Open a meeting tab (${SUPPORTED_HOST_HINT}) and click this extension again.</span>${rejectionHint}`;
+  startBtn.disabled = true;
+  stopBtn.disabled = true;
 }
 
 async function refreshRecordings() {

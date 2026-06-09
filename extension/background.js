@@ -213,6 +213,74 @@ async function saveUploadFailureRecord(message) {
   return failedRecord;
 }
 
+function buildMeetingTabDiagnostics(tabs) {
+  return tabs.map((tab) => ({
+    tabId: tab.id ?? null,
+    active: Boolean(tab.active),
+    windowId: tab.windowId ?? null,
+    title: tab.title ?? null,
+    ...diagnoseMeetingUrl(tab.url ?? ""),
+  }));
+}
+
+async function findBestMeetingTab() {
+  const allTabs = await chrome.tabs.query({});
+  const diagnostics = buildMeetingTabDiagnostics(allTabs);
+
+  const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const activeDiag = diagnoseMeetingUrl(activeTab?.url ?? "");
+
+  let chosenTab = null;
+  if (activeTab && activeDiag.detectedPlatform) {
+    chosenTab = activeTab;
+  } else {
+    for (const tab of allTabs) {
+      const diag = diagnoseMeetingUrl(tab.url ?? "");
+      if (diag.detectedPlatform) {
+        chosenTab = tab;
+        break;
+      }
+    }
+  }
+
+  if (!chosenTab && activeTab) {
+    log("meeting tab not detected for active tab", {
+      activeTabId: activeTab.id,
+      activeDiag,
+      rejectedSamples: diagnostics
+        .filter((d) => d.rejectedReason)
+        .slice(0, 8)
+        .map((d) => ({
+          url: d.url,
+          hostname: d.hostname,
+          rejectedReason: d.rejectedReason,
+        })),
+    });
+  }
+
+  return { tab: chosenTab, diagnostics, activeTabId: activeTab?.id ?? null };
+}
+
+function buildMeetingTabResponse(meetingLookup) {
+  const tab = meetingLookup.tab;
+  const platform = tab?.url ? getMeetingPlatformFromUrl(tab.url) : null;
+  const onMeeting = Boolean(platform);
+
+  return {
+    ok: true,
+    onMeet: onMeeting,
+    onMeeting,
+    platform: platform?.id ?? null,
+    platformLabel: platform?.label ?? null,
+    tabId: tab?.id ?? null,
+    meetUrl: tab?.url ?? null,
+    meetCode: tab?.url ? parseMeetingCode(tab.url) : null,
+    title: tab?.title ?? null,
+    activeTabId: meetingLookup.activeTabId,
+    diagnostics: meetingLookup.diagnostics,
+  };
+}
+
 async function setBadgeForTab(tab) {
   if (!tab?.id) return;
   const platform = tab.url ? getMeetingPlatformFromUrl(tab.url) : null;
@@ -353,22 +421,20 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
-  if (message?.type === "GET_ACTIVE_MEET_TAB") {
+  if (message?.type === "GET_ACTIVE_MEET_TAB" || message?.type === "GET_ACTIVE_MEETING_TAB") {
     void (async () => {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      const platform = tab?.url ? getMeetingPlatformFromUrl(tab.url) : null;
-      const onMeet = Boolean(platform);
-      sendResponse({
-        ok: true,
-        onMeet,
-        onMeeting: onMeet,
-        platform: platform?.id ?? null,
-        platformLabel: platform?.label ?? null,
-        tabId: tab?.id ?? null,
-        meetUrl: tab?.url ?? null,
-        meetCode: tab?.url ? parseMeetingCode(tab.url) : null,
-        title: tab?.title ?? null,
-      });
+      const meetingLookup = await findBestMeetingTab();
+      sendResponse(buildMeetingTabResponse(meetingLookup));
+    })();
+    return true;
+  }
+
+  if (message?.type === "GET_MEETING_DETECTION_DIAGNOSTICS") {
+    void (async () => {
+      const allTabs = await chrome.tabs.query({});
+      const diagnostics = buildMeetingTabDiagnostics(allTabs);
+      log("meeting detection diagnostics", diagnostics);
+      sendResponse({ ok: true, diagnostics });
     })();
     return true;
   }
