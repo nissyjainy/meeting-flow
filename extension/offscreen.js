@@ -300,7 +300,7 @@ async function endRecording() {
   cleanup();
 
   if (blob.size < MIN_RECORDING_BYTES) {
-    const error = `Recording too small (${blob.size} bytes). Stay in the Meet call and record at least 10 seconds.`;
+    const error = `Recording too small (${blob.size} bytes). Stay in the meeting and record at least 10 seconds.`;
     await chrome.runtime.sendMessage({
       type: "RECORDING_FAILED",
       fileName,

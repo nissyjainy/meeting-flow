@@ -19,8 +19,8 @@ const startBtn = $("start-btn");
 const stopBtn = $("stop-btn");
 const resetStateBtn = $("reset-state-btn");
 
-/** @type {{ tabId: number; meetUrl: string; meetCode: string | null; title: string | null } | null} */
-let activeMeet = null;
+/** @type {{ tabId: number; meetUrl: string; meetCode: string | null; title: string | null; platform: string | null; platformLabel: string | null } | null} */
+let activeMeeting = null;
 
 const MIC_PERMISSION_TAB_TIMEOUT_MS = 180_000;
 
@@ -277,9 +277,9 @@ async function signInWithMeetFlow() {
 async function syncCaptureControls() {
   const state = await sendMessage({ type: "GET_CAPTURE_STATE" });
   const recorderActive = Boolean(state?.recorderActive);
-  const onMeet = Boolean(activeMeet?.tabId);
+  const onMeeting = Boolean(activeMeeting?.tabId);
 
-  startBtn.disabled = recorderActive || !onMeet;
+  startBtn.disabled = recorderActive || !onMeeting;
   stopBtn.disabled = !recorderActive;
 
   if (recorderActive) {
@@ -291,7 +291,7 @@ async function syncCaptureControls() {
   return state;
 }
 
-async function refreshMeetTabStatus() {
+async function refreshMeetingTabStatus() {
   const res = await sendMessage({ type: "GET_ACTIVE_MEET_TAB" });
   if (!res?.ok) {
     meetStatusEl.innerHTML = '<span class="meet-bad">Could not read the active tab.</span>';
@@ -300,22 +300,25 @@ async function refreshMeetTabStatus() {
     return;
   }
 
-  activeMeet = res.onMeet
+  const onMeeting = Boolean(res.onMeet || res.onMeeting);
+  activeMeeting = onMeeting
     ? {
         tabId: res.tabId,
         meetUrl: res.meetUrl,
         meetCode: res.meetCode,
         title: res.title,
+        platform: res.platform ?? null,
+        platformLabel: res.platformLabel ?? null,
       }
     : null;
 
-  if (res.onMeet) {
+  if (onMeeting) {
+    const label = res.platformLabel ?? "Meeting";
     const code = res.meetCode ? ` (${res.meetCode})` : "";
-    meetStatusEl.innerHTML = `<span class="meet-ok">Google Meet tab detected${code}</span>`;
+    meetStatusEl.innerHTML = `<span class="meet-ok">Platform: ${label}${code}</span>`;
     await syncCaptureControls();
   } else {
-    meetStatusEl.innerHTML =
-      '<span class="meet-bad">Open a meet.google.com tab and click this extension again.</span>';
+    meetStatusEl.innerHTML = `<span class="meet-bad">Open a meeting tab (${SUPPORTED_HOST_HINT}) and click this extension again.</span>`;
     startBtn.disabled = true;
     stopBtn.disabled = true;
   }
@@ -368,8 +371,8 @@ async function signOut() {
 }
 
 async function startCapture() {
-  if (!activeMeet?.tabId) {
-    setCaptureStatus("No Google Meet tab active.");
+  if (!activeMeeting?.tabId) {
+    setCaptureStatus("No meeting tab active.");
     return;
   }
 
@@ -388,17 +391,17 @@ async function startCapture() {
   setCaptureStatus("Starting offscreen capture…");
   setProgress(0);
 
-  const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: activeMeet.tabId });
+  const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: activeMeeting.tabId });
 
-  log("stream id acquired in popup", { tabId: activeMeet.tabId, hasStreamId: Boolean(streamId) });
+  log("stream id acquired in popup", { tabId: activeMeeting.tabId, hasStreamId: Boolean(streamId) });
 
   const res = await sendMessage({
     type: "START_OFFSCREEN_RECORDING",
     streamId,
-    tabId: activeMeet.tabId,
-    meetUrl: activeMeet.meetUrl,
-    meetCode: activeMeet.meetCode,
-    title: activeMeet.title,
+    tabId: activeMeeting.tabId,
+    meetUrl: activeMeeting.meetUrl,
+    meetCode: activeMeeting.meetCode,
+    title: activeMeeting.title,
   });
   if (!res?.ok) {
     throw new Error(res?.error || "Could not start recording.");
@@ -452,7 +455,7 @@ async function initUi() {
   if (!captureStatusEl.textContent) {
     setCaptureStatus(session.email ? `Signed in as ${session.email}` : "Signed in with MeetFlow.");
   }
-  await Promise.all([refreshMeetTabStatus(), refreshMicPermissionStatus(), refreshRecordings()]);
+  await Promise.all([refreshMeetingTabStatus(), refreshMicPermissionStatus(), refreshRecordings()]);
 }
 
 signInBtn.addEventListener("click", () => {

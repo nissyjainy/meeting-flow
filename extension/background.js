@@ -1,6 +1,5 @@
-importScripts("storage.js", "upload-bytes.js");
+importScripts("storage.js", "upload-bytes.js", "meeting-platform.js");
 
-const MEET_HOST = "meet.google.com";
 const LOG_PREFIX = "[meetflow-capture]";
 
 const DEFAULT_CONFIG = {
@@ -23,25 +22,6 @@ function log(step, detail) {
 
 function logError(step, error, detail) {
   console.error(`${LOG_PREFIX} ${step}`, error, detail ?? "");
-}
-
-function isMeetUrl(url) {
-  try {
-    const parsed = new URL(url);
-    return parsed.hostname === MEET_HOST || parsed.hostname.endsWith(`.${MEET_HOST}`);
-  } catch {
-    return false;
-  }
-}
-
-function parseMeetCode(url) {
-  try {
-    const parsed = new URL(url);
-    const match = parsed.pathname.match(/\/([a-z]{3,}-[a-z]{3,}-[a-z]{3,})/i);
-    return match?.[1] ?? null;
-  } catch {
-    return null;
-  }
 }
 
 async function getConfig() {
@@ -110,7 +90,7 @@ async function ensureOffscreenDocument() {
   await chrome.offscreen.createDocument({
     url: "offscreen.html",
     reasons: ["USER_MEDIA"],
-    justification: "Record Google Meet tab audio while the popup is closed.",
+    justification: "Record meeting tab audio while the popup is closed.",
   });
   log("offscreen document created");
 }
@@ -235,9 +215,10 @@ async function saveUploadFailureRecord(message) {
 
 async function setBadgeForTab(tab) {
   if (!tab?.id) return;
-  if (tab.url && isMeetUrl(tab.url)) {
-    await chrome.action.setBadgeText({ tabId: tab.id, text: "MEET" });
-    await chrome.action.setBadgeBackgroundColor({ tabId: tab.id, color: "#1a73e8" });
+  const platform = tab.url ? getMeetingPlatformFromUrl(tab.url) : null;
+  if (platform) {
+    await chrome.action.setBadgeText({ tabId: tab.id, text: platform.badgeText });
+    await chrome.action.setBadgeBackgroundColor({ tabId: tab.id, color: platform.badgeColor });
   } else {
     await chrome.action.setBadgeText({ tabId: tab.id, text: "" });
   }
@@ -375,13 +356,17 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === "GET_ACTIVE_MEET_TAB") {
     void (async () => {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      const onMeet = Boolean(tab?.url && isMeetUrl(tab.url));
+      const platform = tab?.url ? getMeetingPlatformFromUrl(tab.url) : null;
+      const onMeet = Boolean(platform);
       sendResponse({
         ok: true,
         onMeet,
+        onMeeting: onMeet,
+        platform: platform?.id ?? null,
+        platformLabel: platform?.label ?? null,
         tabId: tab?.id ?? null,
         meetUrl: tab?.url ?? null,
-        meetCode: tab?.url ? parseMeetCode(tab.url) : null,
+        meetCode: tab?.url ? parseMeetingCode(tab.url) : null,
         title: tab?.title ?? null,
       });
     })();
@@ -657,7 +642,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         fileName: message.fileName ?? "meet-capture.webm",
         capturedAt: new Date().toISOString(),
         uploadStatus: "failed",
-        error: "Recording was empty. Record at least 10 seconds in the Meet call.",
+        error: "Recording was empty. Record at least 10 seconds in the meeting.",
         bytes: 0,
       };
       await saveRecordingRecord(failedRecord);
