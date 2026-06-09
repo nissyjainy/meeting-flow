@@ -29,6 +29,8 @@ const PLATFORM_TITLE_SUFFIX_PATTERNS = [
 
 const MEET_CODE_ONLY_TITLE = /^meet - [a-z]{3,}-[a-z]{3,}-[a-z]{3,}$/i;
 
+const STANDALONE_GOOGLE_MEET_CODE = /^[a-z]{3}-[a-z]{4}-[a-z]{3}$/i;
+
 export type CaptureTitleInput = {
   calendarTitle?: string | null;
   tabTitle?: string | null;
@@ -66,8 +68,28 @@ export function isGenericMeetingTitle(title: string | null | undefined): boolean
   const normalized = trimmed.toLowerCase();
   if (GENERIC_TITLE_SET.has(normalized)) return true;
   if (MEET_CODE_ONLY_TITLE.test(trimmed)) return true;
+  if (STANDALONE_GOOGLE_MEET_CODE.test(trimmed)) return true;
   if (/^calendar \| microsoft teams$/i.test(trimmed)) return true;
   return false;
+}
+
+/**
+ * Whether post-transcription AI should replace the stored meeting title.
+ * Preserves calendar and user-friendly capture titles.
+ */
+export function shouldReplaceTitleWithAiGeneratedTitle(
+  title: string | null | undefined,
+  meetingCode: string | null | undefined,
+): boolean {
+  const trimmed = title?.trim() ?? "";
+  if (!trimmed) return true;
+
+  const code = meetingCode?.trim();
+  if (code && trimmed.toLowerCase() === code.toLowerCase()) {
+    return true;
+  }
+
+  return isGenericMeetingTitle(trimmed);
 }
 
 export function extractPlatformMeetingTitle(

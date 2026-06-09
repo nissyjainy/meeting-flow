@@ -3,6 +3,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { runMeetingTaskExtractionPipeline } from "./task-extraction-pipeline.server";
 import { generateMeetingSummaryFromTranscript } from "./summary-groq";
 import { summaryError, summaryLog } from "./summary-debug";
+import { persistAiMeetingTitleIfNeeded } from "./title-pipeline.server";
 
 async function markSummaryFailed(
   supabase: SupabaseClient,
@@ -98,7 +99,7 @@ export async function runMeetingSummaryPipeline(
   try {
     const { data: meeting, error: meetingError } = await supabase
       .from("meetings")
-      .select("id,transcript,summary,status")
+      .select("id,transcript,summary,status,title,meeting_code")
       .eq("id", meetingId)
       .maybeSingle();
 
@@ -117,10 +118,28 @@ export async function runMeetingSummaryPipeline(
       transcriptLength: meeting.transcript.length,
       existingSummary: Boolean(meeting.summary?.trim()),
       currentStatus: meeting.status,
+      currentTitle: meeting.title ?? null,
+      meetingCode: meeting.meeting_code ?? null,
     });
 
-    const summary = await generateMeetingSummaryFromTranscript(meeting.transcript);
+    const [summary, aiTitleOutcome] = await Promise.all([
+      generateMeetingSummaryFromTranscript(meeting.transcript),
+      persistAiMeetingTitleIfNeeded(
+        supabase,
+        meetingId,
+        meeting.transcript,
+        meeting.title,
+        meeting.meeting_code,
+      ),
+    ]);
+
     summaryLog("summary success (Groq)", { meetingId, summaryLength: summary.length });
+    summaryLog("AI title pipeline finished", {
+      meetingId,
+      replaced: aiTitleOutcome.replaced,
+      title: aiTitleOutcome.title ?? null,
+      skippedReason: aiTitleOutcome.skippedReason ?? null,
+    });
 
     await persistSummaryOnly(supabase, meetingId, summary);
 

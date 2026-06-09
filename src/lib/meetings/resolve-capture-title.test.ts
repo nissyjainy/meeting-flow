@@ -4,6 +4,7 @@ import {
   isGenericMeetingTitle,
   meetingUrlsLikelyMatch,
   resolveCaptureTitle,
+  shouldReplaceTitleWithAiGeneratedTitle,
 } from "./resolve-capture-title";
 
 describe("resolveCaptureTitle", () => {
@@ -68,6 +69,30 @@ describe("extractPlatformMeetingTitle", () => {
 describe("isGenericMeetingTitle", () => {
   it("detects meet code only titles", () => {
     expect(isGenericMeetingTitle("Meet - abc-defg-hij")).toBe(true);
+  });
+
+  it("detects standalone Google Meet codes", () => {
+    expect(isGenericMeetingTitle("xxu-jmdw-eno")).toBe(true);
+  });
+});
+
+describe("shouldReplaceTitleWithAiGeneratedTitle", () => {
+  it("replaces when title equals meeting code", () => {
+    expect(shouldReplaceTitleWithAiGeneratedTitle("xxu-jmdw-eno", "xxu-jmdw-eno")).toBe(true);
+  });
+
+  it("replaces generic Meet tab titles", () => {
+    expect(shouldReplaceTitleWithAiGeneratedTitle("Meet - abc-defg-hij", "abc-defg-hij")).toBe(
+      true,
+    );
+  });
+
+  it("preserves calendar and user-friendly titles", () => {
+    expect(shouldReplaceTitleWithAiGeneratedTitle("Test Meeting", "mzc-pmxo-tav")).toBe(false);
+    expect(shouldReplaceTitleWithAiGeneratedTitle("Design review", "abc-defg-hij")).toBe(false);
+    expect(
+      shouldReplaceTitleWithAiGeneratedTitle("Customer onboarding call", "987654321"),
+    ).toBe(false);
   });
 });
 
