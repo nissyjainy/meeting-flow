@@ -386,6 +386,26 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
+  if (message?.type === "MIC_PERMISSION_RESULT") {
+    void (async () => {
+      try {
+        if (message.ok) {
+          await extensionStorageSet(
+            { micPermissionGranted: true, lastMicPermissionError: null },
+            "background",
+          );
+        } else if (message.error) {
+          await extensionStorageSet({ lastMicPermissionError: message.error }, "background");
+        }
+        sendResponse({ ok: true });
+      } catch (error) {
+        logError("MIC_PERMISSION_RESULT failed", error);
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      }
+    })();
+    return true;
+  }
+
   if (message?.type === "START_OFFSCREEN_RECORDING") {
     void (async () => {
       try {

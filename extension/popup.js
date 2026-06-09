@@ -20,6 +20,8 @@ const resetStateBtn = $("reset-state-btn");
 /** @type {{ tabId: number; meetUrl: string; meetCode: string | null; title: string | null } | null} */
 let activeMeet = null;
 
+const MIC_PERMISSION_TAB_TIMEOUT_MS = 180_000;
+
 function log(step, detail) {
   console.info(`${LOG_PREFIX} ${step}`, detail ?? "");
 }
@@ -66,55 +68,104 @@ function setMicPermissionIndicator(state, detail) {
   micStatusEl.className = `status mic-status mic-${state}`;
 }
 
-async function queryMicPermissionState() {
-  try {
-    if (!navigator.permissions?.query) {
-      return "unknown";
-    }
-    const result = await navigator.permissions.query({ name: "microphone" });
-    return result.state;
-  } catch {
-    return "unknown";
+function applyMicFailureUi(error) {
+  if (isMicNotAllowedError(error)) {
+    setMicPermissionIndicator("denied");
+    return;
   }
+  const detail = formatMicStatusDetail(error);
+  setMicPermissionIndicator("unknown", detail ?? MIC_STATUS_LABELS.unknown);
+}
+
+async function isMicrophoneGranted() {
+  const stored = await extensionStorageGet(["micPermissionGranted"], "popup");
+  if (stored.micPermissionGranted) {
+    return true;
+  }
+
+  const state = await queryMicrophonePermissionState();
+  if (state === "granted") {
+    await extensionStorageSet({ micPermissionGranted: true, lastMicPermissionError: null }, "popup");
+    return true;
+  }
+  return false;
+}
+
+function waitForMicPermissionResult() {
+  return new Promise((resolve) => {
+    const listener = (message) => {
+      if (message?.type !== "MIC_PERMISSION_RESULT") {
+        return;
+      }
+      chrome.runtime.onMessage.removeListener(listener);
+      clearTimeout(timer);
+      resolve(message);
+    };
+
+    const timer = setTimeout(() => {
+      chrome.runtime.onMessage.removeListener(listener);
+      resolve({
+        ok: false,
+        error: {
+          name: "TimeoutError",
+          message: "Microphone permission page did not respond. Close the tab and click Start Capture again.",
+        },
+      });
+    }, MIC_PERMISSION_TAB_TIMEOUT_MS);
+
+    chrome.runtime.onMessage.addListener(listener);
+  });
+}
+
+async function ensureMicrophoneViaPermissionTab() {
+  if (await isMicrophoneGranted()) {
+    setMicPermissionIndicator("granted");
+    return true;
+  }
+
+  setCaptureStatus("Opening microphone permission page…");
+  setMicPermissionIndicator(
+    "checking",
+    "Microphone: click Allow microphone in the permission tab when it opens.",
+  );
+
+  const resultPromise = waitForMicPermissionResult();
+  await chrome.tabs.create({ url: chrome.runtime.getURL("request-mic.html") });
+
+  const result = await resultPromise;
+  if (result?.ok) {
+    setMicPermissionIndicator("granted");
+    return true;
+  }
+
+  const error = result?.error ?? { name: "Error", message: "Microphone permission was not granted." };
+  applyMicFailureUi(error);
+  setCaptureStatus(formatMicCaptureStatus(error));
+  return false;
 }
 
 async function refreshMicPermissionStatus() {
   setMicPermissionIndicator("checking");
-  const state = await queryMicPermissionState();
+
+  const stored = await extensionStorageGet(["micPermissionGranted", "lastMicPermissionError"], "popup");
+  if (stored.micPermissionGranted || (await isMicrophoneGranted())) {
+    setMicPermissionIndicator("granted");
+    return "granted";
+  }
+
+  const state = await queryMicrophonePermissionState();
+  if (state === "denied") {
+    setMicPermissionIndicator("denied");
+    return state;
+  }
+
+  if (stored.lastMicPermissionError) {
+    applyMicFailureUi(stored.lastMicPermissionError);
+    return "error";
+  }
+
   setMicPermissionIndicator(state);
   return state;
-}
-
-async function ensureMicrophonePermissionFromGesture() {
-  const current = await queryMicPermissionState();
-  if (current === "granted") {
-    setMicPermissionIndicator("granted");
-    return true;
-  }
-
-  setMicPermissionIndicator("checking", "Microphone: requesting access…");
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-      },
-      video: false,
-    });
-    for (const track of stream.getTracks()) {
-      track.stop();
-    }
-    setMicPermissionIndicator("granted");
-    return true;
-  } catch (error) {
-    logError("microphone permission request failed", error);
-    setMicPermissionIndicator("denied");
-    setCaptureStatus(
-      "Microphone access is required to record your voice. Click Start Capture again to retry.",
-    );
-    return false;
-  }
 }
 
 async function getConfig() {
@@ -291,7 +342,7 @@ async function startCapture() {
     return;
   }
 
-  const micGranted = await ensureMicrophonePermissionFromGesture();
+  const micGranted = await ensureMicrophoneViaPermissionTab();
   if (!micGranted) {
     await syncCaptureControls();
     return;
