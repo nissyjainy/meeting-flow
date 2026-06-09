@@ -291,6 +291,12 @@ async function startCapture() {
     return;
   }
 
+  const micGranted = await ensureMicrophonePermissionFromGesture();
+  if (!micGranted) {
+    await syncCaptureControls();
+    return;
+  }
+
   const { session } = await getSession();
   if (!session?.accessToken) {
     setCaptureStatus("Sign in before recording.");
@@ -301,6 +307,7 @@ async function startCapture() {
   setProgress(0);
 
   const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: activeMeet.tabId });
+
   log("stream id acquired in popup", { tabId: activeMeet.tabId, hasStreamId: Boolean(streamId) });
 
   const res = await sendMessage({
@@ -311,7 +318,6 @@ async function startCapture() {
     meetCode: activeMeet.meetCode,
     title: activeMeet.title,
   });
-
   if (!res?.ok) {
     throw new Error(res?.error || "Could not start recording.");
   }
