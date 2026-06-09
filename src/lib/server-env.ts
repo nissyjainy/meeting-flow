@@ -55,6 +55,7 @@ const workerEnvCache: Record<string, string> = {};
 const WORKER_ENV_ALLOWLIST = [
   "GROQ_API_KEY",
   "GROQ_WHISPER_MODEL",
+  "GROQ_CHAT_MODEL",
   "GOOGLE_CLIENT_ID",
   "GOOGLE_CLIENT_SECRET",
   "GOOGLE_OAUTH_REDIRECT_URI",

@@ -1,9 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { readServerEnv } from "@/lib/server-env";
+import { readServerEnv, maskSecret } from "@/lib/server-env";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { MEETINGS_BUCKET } from "./constants";
+import {
+  isValidGroqApiKey,
+  transcribeAudioWithGroq,
+} from "./groq-transcription.server";
 import { markTranscriptionFailed } from "./mark-transcription-failed.server";
 import { transcriptionError, transcriptionLog } from "./transcription-debug";
 import { uploadDebugReturn } from "./upload-debug";
@@ -13,23 +17,28 @@ const TranscribeMeetingInput = z.object({
   meetingId: z.string().uuid(),
 });
 
-type GroqWhisperResponse = {
-  text?: string;
-};
-
 function getGroqConfig() {
   transcriptionLog("Groq config resolution started");
   try {
     const apiKey = readServerEnv("GROQ_API_KEY");
-    const model = readServerEnv("GROQ_WHISPER_MODEL") || "whisper-large-v3";
+    const model = readServerEnv("GROQ_WHISPER_MODEL") || "whisper-large-v3-turbo";
 
     transcriptionLog("Groq config resolved", {
       model,
       hasApiKey: Boolean(apiKey),
+      apiKeyMasked: maskSecret(apiKey),
+      apiKeyLength: apiKey?.length ?? 0,
+      apiKeyFormatValid: isValidGroqApiKey(apiKey),
     });
 
     if (!apiKey) {
       throw new Error("Missing GROQ_API_KEY. Add it to your server env (see .env.example).");
+    }
+
+    if (!isValidGroqApiKey(apiKey)) {
+      throw new Error(
+        "GROQ_API_KEY is malformed (expected gsk_ prefix). Update the Worker secret with a valid Groq API key.",
+      );
     }
 
     return { apiKey, model };
@@ -46,8 +55,8 @@ export async function runTranscribeMeeting(
   transcriptionLog("runTranscribeMeeting started", { meetingId });
 
   const { data: meeting, error: meetingError } = await supabase
-        .from("meetings")
-        .select("id,file_name,file_url,transcript")
+    .from("meetings")
+    .select("id,file_name,file_url,transcript")
     .eq("id", meetingId)
     .maybeSingle();
 
@@ -96,70 +105,48 @@ export async function runTranscribeMeeting(
   const buf = await fileRes.arrayBuffer();
   transcriptionLog("download file success", { meetingId: meeting.id, bytes: buf.byteLength });
 
-  const blob = new Blob([buf], {
-    type: mimeTypeFromFileName(meeting.file_name),
-  });
-
-  const form = new FormData();
+  const mimeType = mimeTypeFromFileName(meeting.file_name);
+  const fileBlob = new Blob([buf], { type: mimeType });
   const { apiKey, model } = getGroqConfig();
-
-  form.set("model", model);
-  form.set("file", blob, meeting.file_name || "meeting");
 
   transcriptionLog("Groq Whisper request started", {
     meetingId: meeting.id,
     model,
+    endpoint: "https://api.groq.com/openai/v1/audio/transcriptions",
     fileBytes: buf.byteLength,
     fileName: meeting.file_name,
+    mimeType,
+    signedUrlMode: true,
+    fileUploadFallback: true,
   });
 
-  const groqRes = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: form,
-  });
-
-  const groqBody = await groqRes.text().catch(() => "");
+  let groqResult;
+  try {
+    groqResult = await transcribeAudioWithGroq({
+      apiKey,
+      model,
+      signedAudioUrl: signed.signedUrl,
+      fileBlob,
+      fileName: meeting.file_name || "meeting.webm",
+      mimeType,
+    });
+  } catch (error) {
+    transcriptionError("Groq Whisper request failed", error, {
+      meetingId: meeting.id,
+      model,
+    });
+    throw error;
+  }
 
   transcriptionLog("Groq Whisper response received", {
     meetingId: meeting.id,
-    model,
-    httpStatus: groqRes.status,
-    ok: groqRes.ok,
-    bodyPreview: groqBody.slice(0, 500),
+    model: groqResult.model,
+    mode: groqResult.mode,
+    httpStatus: groqResult.httpStatus,
+    transcriptLength: groqResult.text.length,
   });
 
-  if (!groqRes.ok) {
-    const err = new Error(
-      `Groq transcription failed (HTTP ${groqRes.status})${groqBody ? `: ${groqBody}` : ""}`,
-    );
-    transcriptionError("Groq Whisper request failed", err, {
-      meetingId: meeting.id,
-      status: groqRes.status,
-      body: groqBody,
-    });
-    throw err;
-  }
-
-  let json: GroqWhisperResponse;
-  try {
-    json = JSON.parse(groqBody) as GroqWhisperResponse;
-  } catch (parseErr) {
-    transcriptionError("Groq Whisper JSON parse failed", parseErr, {
-      meetingId: meeting.id,
-      body: groqBody,
-    });
-    throw new Error("Groq returned non-JSON response for transcription.");
-  }
-
-  const transcript = (json.text ?? "").trim();
-  transcriptionLog("Groq Whisper transcript extracted", {
-    meetingId: meeting.id,
-    transcriptLength: transcript.length,
-  });
-
+  const transcript = groqResult.text;
   if (!transcript) {
     const err = new Error("Transcription completed but returned empty text.");
     transcriptionError("empty transcript", err, { meetingId: meeting.id });
