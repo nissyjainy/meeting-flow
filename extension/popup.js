@@ -8,6 +8,7 @@ const captureSection = $("capture-section");
 const recordingsSection = $("recordings-section");
 
 const meetStatusEl = $("meet-status");
+const micStatusEl = $("mic-status");
 const captureStatusEl = $("capture-status");
 const progressBar = $("progress-bar");
 const recordingsList = $("recordings-list");
@@ -49,6 +50,71 @@ function setProgress(percent) {
 
 function setCaptureStatus(text) {
   captureStatusEl.textContent = text;
+}
+
+const MIC_STATUS_LABELS = {
+  granted: "Microphone: allowed",
+  denied:
+    "Microphone: blocked — click Start Capture to retry or enable in chrome://settings/content/microphone",
+  prompt: "Microphone: not granted — click Start Capture to allow",
+  unknown: "Microphone: not granted — click Start Capture to allow",
+  checking: "Microphone: checking…",
+};
+
+function setMicPermissionIndicator(state, detail) {
+  micStatusEl.textContent = detail ?? MIC_STATUS_LABELS[state] ?? MIC_STATUS_LABELS.unknown;
+  micStatusEl.className = `status mic-status mic-${state}`;
+}
+
+async function queryMicPermissionState() {
+  try {
+    if (!navigator.permissions?.query) {
+      return "unknown";
+    }
+    const result = await navigator.permissions.query({ name: "microphone" });
+    return result.state;
+  } catch {
+    return "unknown";
+  }
+}
+
+async function refreshMicPermissionStatus() {
+  setMicPermissionIndicator("checking");
+  const state = await queryMicPermissionState();
+  setMicPermissionIndicator(state);
+  return state;
+}
+
+async function ensureMicrophonePermissionFromGesture() {
+  const current = await queryMicPermissionState();
+  if (current === "granted") {
+    setMicPermissionIndicator("granted");
+    return true;
+  }
+
+  setMicPermissionIndicator("checking", "Microphone: requesting access…");
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
+      video: false,
+    });
+    for (const track of stream.getTracks()) {
+      track.stop();
+    }
+    setMicPermissionIndicator("granted");
+    return true;
+  } catch (error) {
+    logError("microphone permission request failed", error);
+    setMicPermissionIndicator("denied");
+    setCaptureStatus(
+      "Microphone access is required to record your voice. Click Start Capture again to retry.",
+    );
+    return false;
+  }
 }
 
 async function getConfig() {
@@ -266,6 +332,20 @@ async function stopCapture() {
   setProgress(100);
   startBtn.disabled = false;
   stopBtn.disabled = true;
+  await syncCaptureControls();
+  await refreshRecordings();
+}
+
+async function resetExtensionState() {
+  setCaptureStatus("Resetting extension state…");
+  const res = await sendMessage({ type: "RESET_EXTENSION_STATE" });
+  if (!res?.ok) {
+    throw new Error(res?.error || "Could not reset extension state.");
+  }
+  setProgress(0);
+  setCaptureStatus("Ready to capture.");
+  await refreshMicPermissionStatus();
+  await syncCaptureControls();
   await refreshRecordings();
 }
 
@@ -294,7 +374,7 @@ async function initUi() {
   if (!captureStatusEl.textContent) {
     setCaptureStatus(session.email ? `Signed in as ${session.email}` : "Signed in.");
   }
-  await Promise.all([refreshMeetTabStatus(), refreshRecordings()]);
+  await Promise.all([refreshMeetTabStatus(), refreshMicPermissionStatus(), refreshRecordings()]);
 }
 
 $("save-config-btn").addEventListener("click", async () => {

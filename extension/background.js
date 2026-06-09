@@ -283,7 +283,8 @@ async function reconcileCaptureState({ forceClear = false } = {}) {
     } catch {
       // Offscreen may not exist after reload.
     }
-    await clearCaptureState("Extension state reset.");
+    await clearCaptureState("Ready to capture.");
+    await extensionStorageSet({ lastRecordingDiagnostics: null }, "background");
     return { captureState, recorderActive: false, staleCleared: true };
   }
 

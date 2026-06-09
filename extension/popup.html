@@ -125,6 +125,21 @@
         font-size: 11px;
         color: #9aa0a6;
       }
+      .mic-status {
+        margin-top: 6px;
+        font-size: 11px;
+      }
+      .mic-granted {
+        color: #81c995;
+      }
+      .mic-denied {
+        color: #f28b82;
+      }
+      .mic-prompt,
+      .mic-unknown,
+      .mic-checking {
+        color: #fdd663;
+      }
     </style>
   </head>
   <body>
@@ -157,6 +172,7 @@
 
     <section id="capture-section" class="card hidden">
       <p id="meet-status" class="status">Checking active tab…</p>
+      <p id="mic-status" class="status mic-status mic-checking">Microphone: checking…</p>
       <p id="capture-status" class="status"></p>
       <div class="progress"><span id="progress-bar"></span></div>
       <div class="row">
