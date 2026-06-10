@@ -1,5 +1,12 @@
 const LOG_PREFIX = "[meetflow-capture:offscreen]";
-const MIN_RECORDING_BYTES = 10_000;
+const {
+  MIN_RECORDING_BYTES,
+  CAPTURE_STATUS,
+  FINALIZE_REASON,
+  shouldAttemptFinalize,
+  getTooSmallMessage,
+  buildFinalizeDiagnostics,
+} = MeetFlowRecordingFinalize;
 
 /** @type {MediaRecorder | null} */
 let mediaRecorder = null;
@@ -23,6 +30,11 @@ let recorderMimeType = "video/webm";
 let meetMeta = null;
 /** @type {string} */
 let recordingMode = "unknown";
+
+/** @type {Promise<unknown> | null} */
+let finalizeInFlight = null;
+let manualStopInProgress = false;
+let abruptTerminationHandled = false;
 
 function log(step, detail) {
   console.info(`${LOG_PREFIX} ${step}`, detail ?? "");
@@ -127,6 +139,7 @@ function cleanup() {
   mediaRecorder = null;
   recordedChunks = [];
   meetMeta = null;
+  abruptTerminationHandled = false;
 }
 
 function buildFileName(meetCode) {
@@ -142,7 +155,74 @@ async function persistDiagnostics(diagnostics) {
   });
 }
 
-async function uploadRecordingBlob({ blob, fileName, meetUrl, meetTitle, diagnostics }) {
+async function notifyCaptureStatus(status) {
+  await chrome.runtime.sendMessage({
+    type: "CAPTURE_STATUS_UPDATE",
+    status,
+  });
+}
+
+function attachCaptureTrackEndListeners() {
+  MeetFlowRecordingFinalize.attachTrackEndedHandlers(fullStream, (track) => {
+    log("capture track ended", { kind: track.kind, id: track.id });
+    void handleAbruptTermination("track_ended");
+  });
+}
+
+async function prepareRecorderForFinalize() {
+  if (!mediaRecorder || mediaRecorder.state === "inactive") {
+    return;
+  }
+
+  await new Promise((resolve) => {
+    const timeout = setTimeout(resolve, 2000);
+    const onStop = () => {
+      clearTimeout(timeout);
+      resolve(undefined);
+    };
+
+    mediaRecorder.addEventListener("stop", onStop, { once: true });
+
+    try {
+      if (mediaRecorder.state === "recording") {
+        mediaRecorder.requestData();
+        mediaRecorder.stop();
+      } else {
+        clearTimeout(timeout);
+        resolve(undefined);
+      }
+    } catch (error) {
+      logError("prepareRecorderForFinalize stop failed", error);
+      clearTimeout(timeout);
+      resolve(undefined);
+    }
+  });
+}
+
+async function handleAbruptTermination(source) {
+  if (manualStopInProgress || abruptTerminationHandled || finalizeInFlight) {
+    return;
+  }
+
+  abruptTerminationHandled = true;
+  log("abrupt termination detected", { source });
+
+  try {
+    await prepareRecorderForFinalize();
+    await finalizeFromChunks({ reason: FINALIZE_REASON.ABRUPT });
+  } catch (error) {
+    logError("handleAbruptTermination failed", error);
+  }
+}
+
+async function uploadRecordingBlob({
+  blob,
+  fileName,
+  meetUrl,
+  meetTitle,
+  diagnostics,
+  partial = false,
+}) {
   await validateWebmBlob(blob, diagnostics.blobSize);
 
   const sessionRes = await chrome.runtime.sendMessage({ type: "GET_UPLOAD_SESSION" });
@@ -167,6 +247,7 @@ async function uploadRecordingBlob({ blob, fileName, meetUrl, meetTitle, diagnos
     bytes: file.size,
     blobType: blob.type,
     uploadUrl: sessionRes.uploadUrl,
+    partial,
   });
 
   const res = await fetch(sessionRes.uploadUrl, {
@@ -192,6 +273,7 @@ async function uploadRecordingBlob({ blob, fileName, meetUrl, meetTitle, diagnos
     viewUrl: body.viewUrl ?? null,
     bytes: file.size,
     diagnostics,
+    partial,
   });
 
   if (!notifyRes?.ok) {
@@ -201,10 +283,114 @@ async function uploadRecordingBlob({ blob, fileName, meetUrl, meetTitle, diagnos
   return body;
 }
 
+async function finalizeFromChunks({ reason = FINALIZE_REASON.MANUAL } = {}) {
+  if (finalizeInFlight) {
+    return finalizeInFlight;
+  }
+
+  finalizeInFlight = (async () => {
+    if (!shouldAttemptFinalize(recordedChunks)) {
+      if (reason === FINALIZE_REASON.MANUAL) {
+        throw new Error("No active recording.");
+      }
+      cleanup();
+      return { ok: false, error: "no_chunks" };
+    }
+
+    if (reason === FINALIZE_REASON.ABRUPT) {
+      await notifyCaptureStatus(CAPTURE_STATUS.MEETING_ENDED_UNEXPECTEDLY);
+      await notifyCaptureStatus(CAPTURE_STATUS.SAVING_RECORDING);
+    }
+
+    const blob = new Blob(recordedChunks, { type: recorderMimeType });
+    const diagnostics = buildFinalizeDiagnostics(
+      mixDiagnostics,
+      blob,
+      recordedChunks.length,
+      reason,
+    );
+
+    log("recording finalized", diagnostics);
+    await persistDiagnostics(diagnostics);
+
+    const fileName = buildFileName(meetMeta?.meetCode ?? null);
+    const meetUrl = meetMeta?.meetUrl ?? null;
+    const meetTitle = meetMeta?.tabTitle ?? null;
+
+    cleanup();
+
+    if (blob.size < MIN_RECORDING_BYTES) {
+      const error = getTooSmallMessage(reason, blob.size);
+      if (reason === FINALIZE_REASON.ABRUPT) {
+        await chrome.runtime.sendMessage({
+          type: "PARTIAL_CAPTURE_TOO_SHORT",
+          fileName,
+          error,
+          diagnostics,
+          meetUrl,
+          meetTitle,
+        });
+      } else {
+        await chrome.runtime.sendMessage({
+          type: "RECORDING_FAILED",
+          fileName,
+          error,
+          diagnostics,
+          meetUrl,
+          meetTitle,
+        });
+      }
+      return { ok: false, error };
+    }
+
+    if (reason === FINALIZE_REASON.ABRUPT) {
+      await notifyCaptureStatus(CAPTURE_STATUS.UPLOADING);
+    }
+
+    try {
+      await uploadRecordingBlob({
+        blob,
+        fileName,
+        meetUrl,
+        meetTitle,
+        diagnostics,
+        partial: reason === FINALIZE_REASON.ABRUPT,
+      });
+      return { ok: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      await chrome.runtime.sendMessage({
+        type: "UPLOAD_FAILED",
+        fileName,
+        error: message,
+        diagnostics,
+        meetUrl,
+        meetTitle,
+        bytes: blob.size,
+      });
+      throw error;
+    }
+  })();
+
+  try {
+    return await finalizeInFlight;
+  } finally {
+    finalizeInFlight = null;
+  }
+}
+
 async function beginRecording(message) {
   if (mediaRecorder && mediaRecorder.state === "recording") {
     throw new Error("Recording already in progress.");
   }
+
+  if (mediaRecorder && mediaRecorder.state !== "recording") {
+    cleanup();
+  }
+
+  abruptTerminationHandled = false;
+  manualStopInProgress = false;
+  finalizeInFlight = null;
 
   meetMeta = {
     meetUrl: message.meetUrl ?? null,
@@ -220,6 +406,8 @@ async function beginRecording(message) {
   for (const track of fullStream.getAudioTracks()) {
     track.enabled = true;
   }
+
+  attachCaptureTrackEndListeners();
 
   micStream = await getMicrophoneStream();
   logStreamDiagnostics("microphone stream", micStream);
@@ -258,8 +446,18 @@ async function beginRecording(message) {
     }
   };
 
+  mediaRecorder.onstop = () => {
+    log("mediaRecorder stopped", { manual: manualStopInProgress });
+    if (!manualStopInProgress && !finalizeInFlight) {
+      void handleAbruptTermination("recorder_stop");
+    }
+  };
+
   mediaRecorder.onerror = (event) => {
     logError("MediaRecorder error", event.error || event);
+    if (!manualStopInProgress) {
+      void handleAbruptTermination("recorder_error");
+    }
   };
 
   mediaRecorder.start(1000);
@@ -271,68 +469,31 @@ async function beginRecording(message) {
 }
 
 async function endRecording() {
-  if (!mediaRecorder || mediaRecorder.state === "inactive") {
+  const recorderActive = Boolean(mediaRecorder && mediaRecorder.state === "recording");
+
+  if (recorderActive) {
+    manualStopInProgress = true;
+    abruptTerminationHandled = true;
+    try {
+      await prepareRecorderForFinalize();
+    } finally {
+      manualStopInProgress = false;
+    }
+  } else if (!shouldAttemptFinalize(recordedChunks)) {
     throw new Error("No active recording.");
   }
 
-  await new Promise((resolve, reject) => {
-    mediaRecorder.onstop = () => resolve();
-    mediaRecorder.onerror = (event) => reject(event.error || new Error("Recorder stop failed"));
-    try {
-      if (mediaRecorder.state === "recording") {
-        mediaRecorder.requestData();
-      }
-      mediaRecorder.stop();
-    } catch (error) {
-      reject(error);
-    }
-  });
+  return finalizeFromChunks({ reason: FINALIZE_REASON.MANUAL });
+}
 
-  const blob = new Blob(recordedChunks, { type: recorderMimeType });
-  const diagnostics = {
-    ...(mixDiagnostics ?? {}),
-    blobSize: blob.size,
-    blobType: blob.type,
-    chunkCount: recordedChunks.length,
-    capturedAt: new Date().toISOString(),
-  };
-
-  log("recording finalized", diagnostics);
-  await persistDiagnostics(diagnostics);
-
-  const fileName = buildFileName(meetMeta?.meetCode ?? null);
-  const meetUrl = meetMeta?.meetUrl ?? null;
-  const meetTitle = meetMeta?.tabTitle ?? null;
-  cleanup();
-
-  if (blob.size < MIN_RECORDING_BYTES) {
-    const error = `Recording too small (${blob.size} bytes). Stay in the meeting and record at least 10 seconds.`;
-    await chrome.runtime.sendMessage({
-      type: "RECORDING_FAILED",
-      fileName,
-      error,
-      diagnostics,
-      meetUrl,
-      meetTitle,
-    });
-    return;
+async function finalizeIfNeeded() {
+  if (!shouldAttemptFinalize(recordedChunks)) {
+    return { ok: false, finalized: false };
   }
 
-  try {
-    await uploadRecordingBlob({ blob, fileName, meetUrl, meetTitle, diagnostics });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    await chrome.runtime.sendMessage({
-      type: "UPLOAD_FAILED",
-      fileName,
-      error: message,
-      diagnostics,
-      meetUrl,
-      meetTitle,
-      bytes: blob.size,
-    });
-    throw error;
-  }
+  await prepareRecorderForFinalize();
+  const result = await finalizeFromChunks({ reason: FINALIZE_REASON.ABRUPT });
+  return { ok: Boolean(result?.ok), finalized: true, error: result?.error };
 }
 
 function getRecorderStatus() {
@@ -341,11 +502,14 @@ function getRecorderStatus() {
     ok: true,
     active,
     recorderState: mediaRecorder?.state ?? "none",
+    hasChunks: shouldAttemptFinalize(recordedChunks),
   };
 }
 
 function forceReset() {
   cleanup();
+  finalizeInFlight = null;
+  manualStopInProgress = false;
   return { ok: true, active: false, recorderState: "none" };
 }
 
@@ -373,10 +537,20 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   if (message?.type === "END_RECORDING") {
     void endRecording()
-      .then(() => sendResponse({ ok: true }))
+      .then((result) => sendResponse({ ok: Boolean(result?.ok), error: result?.error }))
       .catch((error) => {
         logError("endRecording failed", error);
         sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      });
+    return true;
+  }
+
+  if (message?.type === "FINALIZE_IF_NEEDED") {
+    void finalizeIfNeeded()
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => {
+        logError("finalizeIfNeeded failed", error);
+        sendResponse({ ok: false, finalized: false, error: error instanceof Error ? error.message : String(error) });
       });
     return true;
   }

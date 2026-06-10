@@ -404,7 +404,10 @@ async function refreshRecordings() {
   for (const item of recordings) {
     const li = document.createElement("li");
     const when = new Date(item.capturedAt).toLocaleString();
-    const status = item.uploadStatus ?? "unknown";
+    const status =
+      item.uploadStatus === "partial"
+        ? "Partial Capture Uploaded"
+        : (item.uploadStatus ?? "unknown");
     const err = item.error ? ` — ${item.error}` : "";
     const diag = item.diagnostics
       ? ` [tab=${item.diagnostics.tabAudioTrackCount ?? "?"}, mic=${item.diagnostics.micTrackCount ?? "?"}, mixed=${item.diagnostics.mixedAudioTrackCount ?? item.diagnostics.audioTrackCount ?? "?"}, bytes=${item.diagnostics.blobSize}, type=${item.diagnostics.blobType}]`
@@ -543,6 +546,12 @@ resetStateBtn.addEventListener("click", () => {
     setCaptureStatus(error instanceof Error ? error.message : "Could not reset extension state.");
     void syncCaptureControls();
   });
+});
+
+chrome.runtime.onMessage.addListener((message) => {
+  if (message?.type === "CAPTURE_STATUS_UPDATE" && message.status) {
+    setCaptureStatus(message.status);
+  }
 });
 
 void initUi();

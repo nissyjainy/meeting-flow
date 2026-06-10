@@ -1,4 +1,10 @@
-importScripts("storage.js", "upload-bytes.js", "meeting-platform.js", "meeting-metadata.js");
+importScripts(
+  "storage.js",
+  "upload-bytes.js",
+  "meeting-platform.js",
+  "meeting-metadata.js",
+  "recording-finalize.js",
+);
 
 const LOG_PREFIX = "[meetflow-capture]";
 
@@ -189,6 +195,7 @@ async function getUploadSession() {
 }
 
 async function saveUploadSuccessRecord(message) {
+  const partial = Boolean(message.partial);
   const record = {
     id: crypto.randomUUID(),
     meetingId: message.meetingId,
@@ -197,14 +204,18 @@ async function saveUploadSuccessRecord(message) {
     meetTitle: message.meetTitle ?? null,
     capturedAt: message.capturedAt ?? new Date().toISOString(),
     uploadedAt: new Date().toISOString(),
-    uploadStatus: "success",
+    uploadStatus: partial ? "partial" : "success",
     viewUrl: message.viewUrl ?? null,
     bytes: message.bytes ?? 0,
     diagnostics: message.diagnostics ?? null,
   };
 
   await saveRecordingRecord(record);
-  await setLastCaptureStatus(`Upload complete. Meeting ${message.meetingId} (${message.bytes} bytes)`);
+  await setLastCaptureStatus(
+    partial
+      ? MeetFlowRecordingFinalize.CAPTURE_STATUS.PARTIAL_CAPTURE_UPLOADED
+      : `Upload complete. Meeting ${message.meetingId} (${message.bytes} bytes)`,
+  );
   if (message.diagnostics) {
     await extensionStorageSet({ lastRecordingDiagnostics: message.diagnostics }, "background");
   }
@@ -366,6 +377,22 @@ async function reconcileCaptureState({ forceClear = false } = {}) {
   const recorderActive = recorderStatus.active;
 
   if (thinksRecording && !recorderActive) {
+    log("stale recording state — attempting finalize", { captureState, recorderStatus });
+    try {
+      const finalizeResult = await sendToOffscreen({ type: "FINALIZE_IF_NEEDED" });
+      if (finalizeResult?.finalized) {
+        await clearCaptureState();
+        return {
+          captureState,
+          recorderActive: false,
+          staleCleared: false,
+          finalized: true,
+        };
+      }
+    } catch (error) {
+      logError("FINALIZE_IF_NEEDED during reconcile failed", error);
+    }
+
     log("clearing stale recording state", { captureState, recorderStatus });
     await clearCaptureState("Previous recording session ended. Ready to capture.");
     return { captureState, recorderActive: false, staleCleared: true };
@@ -522,6 +549,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       try {
         const current = await reconcileCaptureState();
         if (!current.recorderActive) {
+          await setLastCaptureStatus("Stopping recording…");
+          const finalizeResult = await sendToOffscreen({ type: "END_RECORDING" });
+          if (finalizeResult?.ok) {
+            await clearCaptureState();
+            sendResponse(finalizeResult);
+            return;
+          }
+
           await clearCaptureState("No active recording.");
           sendResponse({ ok: false, error: "No active recording." });
           return;
@@ -540,6 +575,36 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         await clearCaptureState(error instanceof Error ? error.message : "Could not stop recording.");
         sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) });
       }
+    })();
+    return true;
+  }
+
+  if (message?.type === "CAPTURE_STATUS_UPDATE") {
+    void (async () => {
+      if (message.status) {
+        await setLastCaptureStatus(message.status);
+      }
+      sendResponse({ ok: true });
+    })();
+    return true;
+  }
+
+  if (message?.type === "PARTIAL_CAPTURE_TOO_SHORT") {
+    void (async () => {
+      await clearCaptureState(message.error ?? MeetFlowRecordingFinalize.CAPTURE_STATUS.PARTIAL_CAPTURE_TOO_SHORT);
+      const failedRecord = {
+        id: crypto.randomUUID(),
+        fileName: message.fileName ?? "meet-capture.webm",
+        meetUrl: message.meetUrl ?? null,
+        meetTitle: message.meetTitle ?? null,
+        capturedAt: new Date().toISOString(),
+        uploadStatus: "failed",
+        error: message.error ?? MeetFlowRecordingFinalize.CAPTURE_STATUS.PARTIAL_CAPTURE_TOO_SHORT,
+        bytes: message.diagnostics?.blobSize ?? 0,
+        diagnostics: message.diagnostics ?? null,
+      };
+      await saveRecordingRecord(failedRecord);
+      sendResponse({ ok: true });
     })();
     return true;
   }
@@ -644,6 +709,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     void (async () => {
       try {
         const record = await saveUploadSuccessRecord(message);
+        if (captureState.recording) {
+          await clearCaptureState();
+        }
         sendResponse({ ok: true, record });
       } catch (error) {
         logError("UPLOAD_SUCCEEDED handler failed", error);
@@ -657,6 +725,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     void (async () => {
       try {
         const record = await saveUploadFailureRecord(message);
+        if (captureState.recording) {
+          await clearCaptureState(record.error);
+        }
         sendResponse({ ok: true, record });
       } catch (error) {
         logError("UPLOAD_FAILED handler failed", error);
