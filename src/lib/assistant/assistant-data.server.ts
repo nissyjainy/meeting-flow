@@ -2,7 +2,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getPipelineDisplayStatus } from "@/lib/meetings/meeting-display";
 import { enrichMeetingRecord } from "@/lib/meetings/record";
 import { mapMeetingTaskRow, TASK_COLUMNS } from "@/lib/meetings/task-record";
-import { titleFromFileName } from "@/lib/meetings/validation";
 import { assistantLog } from "./assistant-debug";
 import type { AssistantCorpus, AssistantMeetingRecord } from "./types";
 
@@ -94,7 +93,7 @@ export async function loadAssistantCorpus(
     const meeting = enrichMeetingRecord(row);
     return {
       meetingId: meeting.id,
-      meetingTitle: resolveMeetingTitle(row, meeting.title),
+      meetingTitle: meeting.title,
       meetingDate: formatMeetingDate(meeting.created_at),
       createdAt: meeting.created_at,
       summary: meeting.summary,

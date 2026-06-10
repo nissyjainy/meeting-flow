@@ -2,6 +2,7 @@ importScripts(
   "storage.js",
   "upload-bytes.js",
   "meeting-platform.js",
+  "meeting-session.js",
   "meeting-metadata.js",
   "recording-finalize.js",
 );
@@ -21,6 +22,9 @@ const IDLE_CAPTURE_STATE = {
 
 /** @type {{ recording: boolean; tabId: number | null; meetUrl: string | null; startedAt: string | null }} */
 let captureState = { ...IDLE_CAPTURE_STATE };
+
+let captureSessionMonitorTimer = null;
+let captureSessionCheckInFlight = false;
 
 function log(step, detail) {
   console.info(`${LOG_PREFIX} ${step}`, detail ?? "");
@@ -326,11 +330,71 @@ async function syncCaptureState(next) {
 }
 
 async function clearCaptureState(statusMessage) {
+  stopCaptureSessionMonitor();
   captureState = { ...IDLE_CAPTURE_STATE };
   await extensionStorageSet({ captureState }, "background");
   if (statusMessage) {
     await setLastCaptureStatus(statusMessage);
   }
+}
+
+async function triggerAbruptMeetingEnd(source) {
+  if (!captureState.recording) {
+    return;
+  }
+
+  log("capture meeting session ended", { source, tabId: captureState.tabId });
+
+  try {
+    await sendToOffscreen({ type: "TRIGGER_ABRUPT_TERMINATION", source });
+  } catch (error) {
+    logError("triggerAbruptMeetingEnd failed", error);
+  }
+}
+
+async function checkCaptureMeetingSession() {
+  if (!captureState.recording || captureSessionCheckInFlight) {
+    return;
+  }
+
+  const tabId = captureState.tabId;
+  if (!tabId) {
+    return;
+  }
+
+  let tab = null;
+  try {
+    tab = await chrome.tabs.get(tabId);
+  } catch {
+    tab = null;
+  }
+
+  if (!isCaptureTabSessionEnded(tab, captureState)) {
+    return;
+  }
+
+  captureSessionCheckInFlight = true;
+  try {
+    await triggerAbruptMeetingEnd("capture_tab_session_ended");
+  } finally {
+    captureSessionCheckInFlight = false;
+  }
+}
+
+function startCaptureSessionMonitor() {
+  stopCaptureSessionMonitor();
+  void checkCaptureMeetingSession();
+  captureSessionMonitorTimer = setInterval(() => {
+    void checkCaptureMeetingSession();
+  }, 3000);
+}
+
+function stopCaptureSessionMonitor() {
+  if (captureSessionMonitorTimer) {
+    clearInterval(captureSessionMonitorTimer);
+    captureSessionMonitorTimer = null;
+  }
+  captureSessionCheckInFlight = false;
 }
 
 async function getOffscreenRecorderStatus() {
@@ -412,6 +476,9 @@ async function initializeExtensionState() {
       captureState = { ...IDLE_CAPTURE_STATE, ...stored.captureState };
     }
     await reconcileCaptureState();
+    if (captureState.recording) {
+      startCaptureSessionMonitor();
+    }
   } catch (error) {
     logError("initializeExtensionState failed", error);
   }
@@ -420,6 +487,20 @@ async function initializeExtensionState() {
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.url || changeInfo.status === "complete") {
     void setBadgeForTab(tab);
+  }
+
+  if (
+    captureState.recording &&
+    tabId === captureState.tabId &&
+    (changeInfo.url || changeInfo.title || changeInfo.status === "complete")
+  ) {
+    void checkCaptureMeetingSession();
+  }
+});
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  if (captureState.recording && tabId === captureState.tabId) {
+    void triggerAbruptMeetingEnd("capture_tab_closed");
   }
 });
 
@@ -531,8 +612,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           recording: true,
           tabId: message.tabId ?? null,
           meetUrl: message.meetUrl ?? null,
+          meetCode: message.meetCode ?? parseMeetingCode(message.meetUrl ?? "") ?? null,
+          tabTitle: message.tabTitle ?? message.title ?? null,
           startedAt: new Date().toISOString(),
         });
+        startCaptureSessionMonitor();
         await setLastCaptureStatus("Recording… You can close this popup.");
         sendResponse(result);
       } catch (error) {

@@ -1,12 +1,5 @@
 const LOG_PREFIX = "[meetflow-capture:offscreen]";
-const {
-  MIN_RECORDING_BYTES,
-  CAPTURE_STATUS,
-  FINALIZE_REASON,
-  shouldAttemptFinalize,
-  getTooSmallMessage,
-  buildFinalizeDiagnostics,
-} = MeetFlowRecordingFinalize;
+const finalize = globalThis.MeetFlowRecordingFinalize;
 
 /** @type {MediaRecorder | null} */
 let mediaRecorder = null;
@@ -35,6 +28,9 @@ let recordingMode = "unknown";
 let finalizeInFlight = null;
 let manualStopInProgress = false;
 let abruptTerminationHandled = false;
+/** @type {ReturnType<typeof setInterval> | null} */
+let sessionWatchInterval = null;
+let tabCaptureMutedTicks = 0;
 
 function log(step, detail) {
   console.info(`${LOG_PREFIX} ${step}`, detail ?? "");
@@ -117,7 +113,49 @@ async function createMixedAudioStream(tabStream, microphoneStream) {
   return mixDestination.stream;
 }
 
+function stopSessionWatch() {
+  if (sessionWatchInterval) {
+    clearInterval(sessionWatchInterval);
+    sessionWatchInterval = null;
+  }
+  tabCaptureMutedTicks = 0;
+}
+
+function startSessionWatch() {
+  stopSessionWatch();
+  sessionWatchInterval = setInterval(() => {
+    if (!mediaRecorder || mediaRecorder.state !== "recording") {
+      return;
+    }
+    if (manualStopInProgress || abruptTerminationHandled || finalizeInFlight) {
+      return;
+    }
+    if (!fullStream) {
+      return;
+    }
+
+    const tracks = fullStream.getTracks();
+    if (tracks.some((track) => track.readyState === "ended")) {
+      log("session watch: tab capture track ended");
+      void handleAbruptTermination("session_watch_track_ended");
+      return;
+    }
+
+    const liveTabAudio = fullStream.getAudioTracks().filter((track) => track.readyState === "live");
+    if (liveTabAudio.length > 0 && liveTabAudio.every((track) => track.muted)) {
+      tabCaptureMutedTicks += 1;
+      if (tabCaptureMutedTicks >= 4) {
+        log("session watch: tab capture audio muted");
+        void handleAbruptTermination("session_watch_tab_audio_muted");
+      }
+    } else {
+      tabCaptureMutedTicks = 0;
+    }
+  }, 2000);
+}
+
 function cleanup() {
+  stopSessionWatch();
   if (recordingStream && recordingStream !== fullStream) {
     for (const track of recordingStream.getTracks()) track.stop();
   }
@@ -163,7 +201,7 @@ async function notifyCaptureStatus(status) {
 }
 
 function attachCaptureTrackEndListeners() {
-  MeetFlowRecordingFinalize.attachTrackEndedHandlers(fullStream, (track) => {
+  finalize.attachTrackEndedHandlers(fullStream, (track) => {
     log("capture track ended", { kind: track.kind, id: track.id });
     void handleAbruptTermination("track_ended");
   });
@@ -209,7 +247,7 @@ async function handleAbruptTermination(source) {
 
   try {
     await prepareRecorderForFinalize();
-    await finalizeFromChunks({ reason: FINALIZE_REASON.ABRUPT });
+    await finalizeFromChunks({ reason: finalize.FINALIZE_REASON.ABRUPT });
   } catch (error) {
     logError("handleAbruptTermination failed", error);
   }
@@ -283,27 +321,27 @@ async function uploadRecordingBlob({
   return body;
 }
 
-async function finalizeFromChunks({ reason = FINALIZE_REASON.MANUAL } = {}) {
+async function finalizeFromChunks({ reason = finalize.FINALIZE_REASON.MANUAL } = {}) {
   if (finalizeInFlight) {
     return finalizeInFlight;
   }
 
   finalizeInFlight = (async () => {
-    if (!shouldAttemptFinalize(recordedChunks)) {
-      if (reason === FINALIZE_REASON.MANUAL) {
+    if (!finalize.shouldAttemptFinalize(recordedChunks)) {
+      if (reason === finalize.FINALIZE_REASON.MANUAL) {
         throw new Error("No active recording.");
       }
       cleanup();
       return { ok: false, error: "no_chunks" };
     }
 
-    if (reason === FINALIZE_REASON.ABRUPT) {
-      await notifyCaptureStatus(CAPTURE_STATUS.MEETING_ENDED_UNEXPECTEDLY);
-      await notifyCaptureStatus(CAPTURE_STATUS.SAVING_RECORDING);
+    if (reason === finalize.FINALIZE_REASON.ABRUPT) {
+      await notifyCaptureStatus(finalize.CAPTURE_STATUS.MEETING_ENDED_UNEXPECTEDLY);
+      await notifyCaptureStatus(finalize.CAPTURE_STATUS.SAVING_RECORDING);
     }
 
     const blob = new Blob(recordedChunks, { type: recorderMimeType });
-    const diagnostics = buildFinalizeDiagnostics(
+    const diagnostics = finalize.buildFinalizeDiagnostics(
       mixDiagnostics,
       blob,
       recordedChunks.length,
@@ -319,9 +357,9 @@ async function finalizeFromChunks({ reason = FINALIZE_REASON.MANUAL } = {}) {
 
     cleanup();
 
-    if (blob.size < MIN_RECORDING_BYTES) {
-      const error = getTooSmallMessage(reason, blob.size);
-      if (reason === FINALIZE_REASON.ABRUPT) {
+    if (blob.size < finalize.MIN_RECORDING_BYTES) {
+      const error = finalize.getTooSmallMessage(reason, blob.size);
+      if (reason === finalize.FINALIZE_REASON.ABRUPT) {
         await chrome.runtime.sendMessage({
           type: "PARTIAL_CAPTURE_TOO_SHORT",
           fileName,
@@ -343,8 +381,8 @@ async function finalizeFromChunks({ reason = FINALIZE_REASON.MANUAL } = {}) {
       return { ok: false, error };
     }
 
-    if (reason === FINALIZE_REASON.ABRUPT) {
-      await notifyCaptureStatus(CAPTURE_STATUS.UPLOADING);
+    if (reason === finalize.FINALIZE_REASON.ABRUPT) {
+      await notifyCaptureStatus(finalize.CAPTURE_STATUS.UPLOADING);
     }
 
     try {
@@ -354,7 +392,7 @@ async function finalizeFromChunks({ reason = FINALIZE_REASON.MANUAL } = {}) {
         meetUrl,
         meetTitle,
         diagnostics,
-        partial: reason === FINALIZE_REASON.ABRUPT,
+        partial: reason === finalize.FINALIZE_REASON.ABRUPT,
       });
       return { ok: true };
     } catch (error) {
@@ -461,6 +499,7 @@ async function beginRecording(message) {
   };
 
   mediaRecorder.start(1000);
+  startSessionWatch();
   log("recording started", {
     mimeType: recorderMimeType,
     mode: recordingMode,
@@ -479,20 +518,20 @@ async function endRecording() {
     } finally {
       manualStopInProgress = false;
     }
-  } else if (!shouldAttemptFinalize(recordedChunks)) {
+  } else if (!finalize.shouldAttemptFinalize(recordedChunks)) {
     throw new Error("No active recording.");
   }
 
-  return finalizeFromChunks({ reason: FINALIZE_REASON.MANUAL });
+  return finalizeFromChunks({ reason: finalize.FINALIZE_REASON.MANUAL });
 }
 
 async function finalizeIfNeeded() {
-  if (!shouldAttemptFinalize(recordedChunks)) {
+  if (!finalize.shouldAttemptFinalize(recordedChunks)) {
     return { ok: false, finalized: false };
   }
 
   await prepareRecorderForFinalize();
-  const result = await finalizeFromChunks({ reason: FINALIZE_REASON.ABRUPT });
+  const result = await finalizeFromChunks({ reason: finalize.FINALIZE_REASON.ABRUPT });
   return { ok: Boolean(result?.ok), finalized: true, error: result?.error };
 }
 
@@ -502,7 +541,7 @@ function getRecorderStatus() {
     ok: true,
     active,
     recorderState: mediaRecorder?.state ?? "none",
-    hasChunks: shouldAttemptFinalize(recordedChunks),
+    hasChunks: finalize.shouldAttemptFinalize(recordedChunks),
   };
 }
 
@@ -551,6 +590,16 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       .catch((error) => {
         logError("finalizeIfNeeded failed", error);
         sendResponse({ ok: false, finalized: false, error: error instanceof Error ? error.message : String(error) });
+      });
+    return true;
+  }
+
+  if (message?.type === "TRIGGER_ABRUPT_TERMINATION") {
+    void handleAbruptTermination(message.source ?? "external")
+      .then(() => sendResponse({ ok: true }))
+      .catch((error) => {
+        logError("TRIGGER_ABRUPT_TERMINATION failed", error);
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) });
       });
     return true;
   }
