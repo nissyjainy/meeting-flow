@@ -1,37 +1,11 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import {
-  LayoutDashboard,
-  Video,
-  ListChecks,
-  Users,
-  Settings,
-  Bell,
-  Sparkles,
-  Plus,
-  Loader2,
-  BarChart3,
-  LineChart,
-  Activity,
-  MessageSquare,
-} from "lucide-react";
+import { Plus, Loader2, Sparkles } from "lucide-react";
+import { appNav, isAppNavActive } from "@/components/app/app-nav";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useMeetingUploadTrigger } from "@/providers/meeting-upload-provider";
 import { PRODUCT_NAME } from "@/lib/branding";
-
-const nav = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/assistant", label: "Assistant", icon: MessageSquare },
-  { to: "/meetings", label: "Meetings", icon: Video },
-  { to: "/tasks", label: "Tasks", icon: ListChecks },
-  { to: "/team-insights", label: "Team Insights", icon: BarChart3 },
-  { to: "/execution-health", label: "Execution Health", icon: Activity },
-  { to: "/analytics", label: "Analytics", icon: LineChart },
-  { to: "/notifications", label: "Notifications", icon: Bell },
-  { to: "/team", label: "Team", icon: Users },
-  { to: "/settings", label: "Settings", icon: Settings },
-] as const;
 
 export function AppSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -67,8 +41,8 @@ export function AppSidebar() {
       </div>
 
       <nav className="flex-1 space-y-1 px-3">
-        {nav.map((item) => {
-          const active = item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
+        {appNav.map((item) => {
+          const active = isAppNavActive(pathname, item.to);
           return (
             <Link
               key={item.to}
