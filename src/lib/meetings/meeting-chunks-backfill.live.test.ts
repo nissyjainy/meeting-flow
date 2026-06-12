@@ -1,39 +1,10 @@
-import { existsSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { describe, expect, it } from "vitest";
 import { ensureServerEnvLoaded } from "@/lib/server-env.node";
 import { generateQueryEmbedding } from "./embeddings.server";
+import { indexMeetingTranscriptChunks } from "./meeting-chunks-index.server";
 
 ensureServerEnvLoaded();
-
-function ensureCloudflareEmbeddingEnv(): void {
-  if (!process.env.CLOUDFLARE_ACCOUNT_ID?.trim()) {
-    process.env.CLOUDFLARE_ACCOUNT_ID = "0ba1efac4920a2f7f9e9be00379d82a6";
-  }
-
-  if (process.env.CLOUDFLARE_API_TOKEN?.trim()) return;
-
-  const configPath = join(
-    homedir(),
-    "AppData",
-    "Roaming",
-    "xdg.config",
-    ".wrangler",
-    "config",
-    "default.toml",
-  );
-  if (!existsSync(configPath)) return;
-
-  const match = readFileSync(configPath, "utf8").match(/^oauth_token\s*=\s*"([^"]+)"/m);
-  if (match?.[1]) {
-    process.env.CLOUDFLARE_API_TOKEN = match[1];
-  }
-}
-
-ensureCloudflareEmbeddingEnv();
-import { indexMeetingTranscriptChunks } from "./meeting-chunks-index.server";
 
 const hasEnv = Boolean(
   process.env.GROQ_API_KEY?.trim() &&

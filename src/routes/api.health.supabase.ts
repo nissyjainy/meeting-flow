@@ -29,7 +29,6 @@ export const Route = createFileRoute("/api/health/supabase")({
         return Response.json({
           ...diagnostics,
           captureStatusProbe,
-          expectedProjectRef: "uzddznccxnolcarxykbc",
         });
       },
     },

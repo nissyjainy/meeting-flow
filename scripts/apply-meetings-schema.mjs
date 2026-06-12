@@ -3,7 +3,7 @@
  *
  * Requires one of:
  *   DATABASE_URL=postgresql://...
- *   SUPABASE_DB_PASSWORD=...  (uses project ref uzddznccxnolcarxykbc by default)
+ *   SUPABASE_DB_PASSWORD=...  (with SUPABASE_PROJECT_REF or VITE_SUPABASE_URL in .env.local)
  *
  * Usage:
  *   node scripts/apply-meetings-schema.mjs
@@ -11,8 +11,6 @@
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import postgres from "postgres";
-
-const PROJECT_REF = process.env.SUPABASE_PROJECT_REF ?? "uzddznccxnolcarxykbc";
 
 function loadDotEnvLocal() {
   const path = resolve(process.cwd(), ".env.local");
@@ -37,6 +35,25 @@ function loadDotEnvLocal() {
   }
 }
 
+function resolveProjectRef() {
+  const explicit = process.env.SUPABASE_PROJECT_REF?.trim();
+  if (explicit) return explicit;
+
+  const url = process.env.VITE_SUPABASE_URL?.trim() ?? process.env.SUPABASE_URL?.trim();
+  if (url) {
+    try {
+      const ref = new URL(url).hostname.split(".")[0]?.trim();
+      if (ref && ref !== "your-project") return ref;
+    } catch {
+      // ignore invalid URL
+    }
+  }
+
+  throw new Error(
+    "Set SUPABASE_PROJECT_REF or VITE_SUPABASE_URL in .env.local to identify your Supabase project.",
+  );
+}
+
 function resolveDatabaseUrl() {
   if (process.env.DATABASE_URL?.trim()) {
     return process.env.DATABASE_URL.trim();
@@ -49,7 +66,8 @@ function resolveDatabaseUrl() {
     );
   }
 
-  const host = process.env.SUPABASE_DB_HOST ?? `db.${PROJECT_REF}.supabase.co`;
+  const projectRef = resolveProjectRef();
+  const host = process.env.SUPABASE_DB_HOST ?? `db.${projectRef}.supabase.co`;
   return `postgresql://postgres:${encodeURIComponent(password)}@${host}:5432/postgres`;
 }
 

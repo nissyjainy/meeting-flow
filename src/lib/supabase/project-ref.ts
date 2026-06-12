@@ -14,7 +14,7 @@ export function extractJwtProjectRef(token: string | undefined): string | null {
   }
 }
 
-/** Extract the Supabase project ref from a project URL (e.g. `uzddznccxnolcarxykbc`). */
+/** Extract the Supabase project ref from a project URL (e.g. `your-project-ref`). */
 export function extractSupabaseProjectRef(url: string | undefined): string | null {
   if (!url?.trim()) return null;
 

@@ -6,20 +6,22 @@ import {
   isSupabaseSchemaCacheError,
 } from "./project-ref";
 
+const SAMPLE_PROJECT_REF = "abcdefghijklmnop";
+
 const SERVICE_ROLE_SAMPLE =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6ZGR6bmNjeG5vbGNhcnh5a2JjIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3OTE5ODYxOCwiZXhwIjoyMDk0Nzc0NjE4fQ.test";
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFiY2RlZmdoaWprbG1ub3AiLCJyb2xlIjoic2VydmljZV9yb2xlIiwiaWF0IjoxNzc5MTk4NjE4LCJleHAiOjIwOTQ3NzQ2MTh9.test";
 
 describe("extractJwtProjectRef", () => {
   it("extracts ref from a Supabase service role JWT", () => {
-    expect(extractJwtProjectRef(SERVICE_ROLE_SAMPLE)).toBe("uzddznccxnolcarxykbc");
+    expect(extractJwtProjectRef(SERVICE_ROLE_SAMPLE)).toBe(SAMPLE_PROJECT_REF);
   });
 });
 
 describe("extractSupabaseProjectRef", () => {
   it("extracts the project ref from a Supabase URL", () => {
-    expect(extractSupabaseProjectRef("https://uzddznccxnolcarxykbc.supabase.co")).toBe(
-      "uzddznccxnolcarxykbc",
-    );
+    expect(
+      extractSupabaseProjectRef(`https://${SAMPLE_PROJECT_REF}.supabase.co`),
+    ).toBe(SAMPLE_PROJECT_REF);
   });
 
   it("returns null for invalid URLs", () => {
@@ -43,10 +45,10 @@ describe("formatSupabaseSchemaError", () => {
     const message = formatSupabaseSchemaError(
       "Could not find the 'capture_status' column of 'calendar_events' in the schema cache",
       "select calendar_events",
-      "https://uzddznccxnolcarxykbc.supabase.co",
+      `https://${SAMPLE_PROJECT_REF}.supabase.co`,
     );
 
-    expect(message).toContain("uzddznccxnolcarxykbc");
+    expect(message).toContain(SAMPLE_PROJECT_REF);
     expect(message).toContain("select calendar_events");
     expect(message).toContain("NOTIFY pgrst");
   });

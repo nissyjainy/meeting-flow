@@ -5,43 +5,41 @@ import {
   resolveGoogleOAuthRedirectUri,
 } from "./oauth-redirect";
 
-const PRODUCTION_REQUEST = "https://meeting-flow.nisargjain.workers.dev/api/integrations/google/connect";
-const PRODUCTION_CALLBACK =
-  "https://meeting-flow.nisargjain.workers.dev/api/integrations/google/callback";
+const DEPLOYED_REQUEST = "https://your-app.workers.dev/api/integrations/google/connect";
+const DEPLOYED_CALLBACK = "https://your-app.workers.dev/api/integrations/google/callback";
 
 describe("resolveGoogleOAuthRedirectUri", () => {
   it("uses request origin when APP_URL is localhost but request is production", () => {
     expect(
-      resolveGoogleOAuthRedirectUri(PRODUCTION_REQUEST, {
+      resolveGoogleOAuthRedirectUri(DEPLOYED_REQUEST, {
         appUrl: "http://localhost:8080",
       }),
-    ).toBe(PRODUCTION_CALLBACK);
+    ).toBe(DEPLOYED_CALLBACK);
   });
 
   it("uses request origin when explicit redirect is localhost but request is production", () => {
     expect(
-      resolveGoogleOAuthRedirectUri(PRODUCTION_REQUEST, {
+      resolveGoogleOAuthRedirectUri(DEPLOYED_REQUEST, {
         appUrl: "http://localhost:8080",
         explicitRedirectUri: "http://localhost:8080/api/integrations/google/callback",
       }),
-    ).toBe(PRODUCTION_CALLBACK);
+    ).toBe(DEPLOYED_CALLBACK);
   });
 
   it("keeps explicit production redirect when it matches the deployment", () => {
     expect(
-      resolveGoogleOAuthRedirectUri(PRODUCTION_REQUEST, {
-        explicitRedirectUri: PRODUCTION_CALLBACK,
+      resolveGoogleOAuthRedirectUri(DEPLOYED_REQUEST, {
+        explicitRedirectUri: DEPLOYED_CALLBACK,
       }),
-    ).toBe(PRODUCTION_CALLBACK);
+    ).toBe(DEPLOYED_CALLBACK);
   });
 
   it("ignores explicit redirect URIs that use the wrong callback path", () => {
     expect(
-      resolveGoogleOAuthRedirectUri(PRODUCTION_REQUEST, {
-        explicitRedirectUri:
-          "https://meeting-flow.nisargjain.workers.dev/api/auth/callback/google",
+      resolveGoogleOAuthRedirectUri(DEPLOYED_REQUEST, {
+        explicitRedirectUri: "https://your-app.workers.dev/api/auth/callback/google",
       }),
-    ).toBe(PRODUCTION_CALLBACK);
+    ).toBe(DEPLOYED_CALLBACK);
   });
 
   it("falls back to APP_URL when no request is available", () => {
@@ -55,6 +53,6 @@ describe("resolveGoogleOAuthRedirectUri", () => {
 
 describe("googleOAuthRedirectUriFromRequest", () => {
   it("builds the callback path from the request origin", () => {
-    expect(googleOAuthRedirectUriFromRequest(PRODUCTION_REQUEST)).toBe(PRODUCTION_CALLBACK);
+    expect(googleOAuthRedirectUriFromRequest(DEPLOYED_REQUEST)).toBe(DEPLOYED_CALLBACK);
   });
 });

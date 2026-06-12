@@ -2,7 +2,7 @@
 
 ## 1. Run the migration
 
-Open the [SQL Editor](https://supabase.com/dashboard/project/uzddznccxnolcarxykbc/sql) for your project and run:
+Open the [SQL Editor](https://supabase.com/dashboard/project/_/sql) for your project and run:
 
 `migrations/20260520200000_meetings_schema.sql`
 
