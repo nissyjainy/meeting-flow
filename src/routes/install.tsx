@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import {
   Bot,
   Download,
+  Github,
   FileText,
   FolderOpen,
   ListChecks,
@@ -16,7 +17,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { pageTitle, PRODUCT_NAME, PRODUCT_TAGLINE } from "@/lib/branding";
-import { EXTENSION_LATEST_RELEASE_URL } from "@/lib/extension/install";
+import {
+  EXTENSION_GITHUB_REPOSITORY_URL,
+  EXTENSION_LATEST_RELEASE_URL,
+} from "@/lib/extension/install";
 import { cn } from "@/lib/utils";
 
 const INSTALL_STEPS = [
@@ -111,19 +115,32 @@ function InstallPage() {
           <p className="mx-auto mt-4 max-w-2xl text-base text-muted-foreground sm:text-lg">
             Capture meetings from Google Meet, Zoom, and Teams.
           </p>
-          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Button
-              size="lg"
-              className="h-11 min-w-[12rem] bg-gradient-primary text-primary-foreground shadow-elegant hover:opacity-90"
-              asChild
-            >
-              <a href={EXTENSION_LATEST_RELEASE_URL} target="_blank" rel="noopener noreferrer">
-                <Download className="mr-2 h-4 w-4" />
-                Download Extension
-              </a>
-            </Button>
-            <p className="text-xs text-muted-foreground sm:max-w-xs">
-              Opens the latest release on GitHub. Download the ZIP asset, then follow the steps below.
+          <div className="mt-8 flex flex-col items-center gap-4">
+            <div className="flex w-full max-w-md flex-col gap-3 sm:max-w-none sm:flex-row sm:justify-center">
+              <Button
+                size="lg"
+                className="h-11 w-full bg-gradient-primary text-primary-foreground shadow-elegant hover:opacity-90 sm:w-auto sm:min-w-[12rem]"
+                asChild
+              >
+                <a href={EXTENSION_LATEST_RELEASE_URL} target="_blank" rel="noopener noreferrer">
+                  <Download className="mr-2 h-4 w-4" />
+                  Download Extension
+                </a>
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                className="h-11 w-full sm:w-auto sm:min-w-[12rem]"
+                asChild
+              >
+                <a href={EXTENSION_GITHUB_REPOSITORY_URL} target="_blank" rel="noopener noreferrer">
+                  <Github className="mr-2 h-4 w-4" />
+                  GitHub Repository
+                </a>
+              </Button>
+            </div>
+            <p className="max-w-md text-xs text-muted-foreground">
+              Download the latest release ZIP from GitHub, then follow the steps below.
             </p>
           </div>
         </motion.section>
