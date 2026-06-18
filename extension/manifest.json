@@ -14,7 +14,7 @@
     "https://teams.microsoft.com/*",
     "https://teams.live.com/*",
     "https://teams.cloud.microsoft/*",
-    "https://your-app.workers.dev/*",
+    "https://meetflow.nisargjain.workers.dev/*",
     "http://localhost:8080/*",
     "http://127.0.0.1:8080/*"
   ],

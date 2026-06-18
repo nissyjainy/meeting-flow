@@ -12,7 +12,7 @@ importScripts(
 const LOG_PREFIX = "[meetflow-capture]";
 
 const DEFAULT_CONFIG = {
-  meetflowUrl: "http://localhost:8080",
+  meetflowUrl: "https://meetflow.nisargjain.workers.dev",
 };
 
 const IDLE_CAPTURE_STATE = {
