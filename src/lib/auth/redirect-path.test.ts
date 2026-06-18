@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildOAuthRedirectUrl, normalizeAuthRedirectPath } from "./redirect-path";
+import {
+  buildOAuthRedirectUrl,
+  createAuthenticatedUserRedirect,
+  normalizeAuthRedirectPath,
+} from "./redirect-path";
 
 describe("normalizeAuthRedirectPath", () => {
   it("returns default for empty input", () => {
@@ -39,5 +43,19 @@ describe("buildOAuthRedirectUrl", () => {
     expect(buildOAuthRedirectUrl("http://localhost:8080", "http://localhost:8080/meetings")).toBe(
       "http://localhost:8080/auth/callback?redirect=%2Fmeetings",
     );
+  });
+});
+
+describe("createAuthenticatedUserRedirect", () => {
+  const extensionPath =
+    "/extension/auth?redirect_uri=https%3A%2F%2Fabcdefghijklmnop.chromiumapp.org%2F";
+
+  it("uses href for server-handled extension auth paths", () => {
+    expect(createAuthenticatedUserRedirect(extensionPath)).toEqual({ href: extensionPath });
+  });
+
+  it("uses SPA navigation for normal app routes", () => {
+    expect(createAuthenticatedUserRedirect("/meetings")).toEqual({ to: "/meetings" });
+    expect(createAuthenticatedUserRedirect(undefined)).toEqual({ to: "/" });
   });
 });

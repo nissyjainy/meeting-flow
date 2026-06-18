@@ -1,4 +1,5 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createAuthenticatedUserRedirect } from "@/lib/auth/redirect-path";
 import { AuthShell } from "./login";
 import { pageTitle, PRODUCT_NAME, PRODUCT_TAGLINE } from "@/lib/branding";
 
@@ -12,7 +13,7 @@ export const Route = createFileRoute("/signup")({
   }),
   beforeLoad: ({ context, search }) => {
     if (context.user) {
-      throw redirect({ href: search.redirect ?? "/" });
+      throw redirect(createAuthenticatedUserRedirect(search.redirect));
     }
   },
   head: () => ({

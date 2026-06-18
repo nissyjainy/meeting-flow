@@ -43,3 +43,12 @@ export function buildOAuthRedirectUrl(origin: string, finalRedirectPath?: string
   }
   return callback.toString();
 }
+
+/** Use full document navigation for server-only routes (e.g. extension OAuth). */
+export function createAuthenticatedUserRedirect(redirect?: string | null) {
+  const next = normalizeAuthRedirectPath(redirect);
+  if (isServerHandledAuthPath(next)) {
+    return { href: next } as const;
+  }
+  return { to: next } as const;
+}

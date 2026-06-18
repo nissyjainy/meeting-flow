@@ -12,6 +12,7 @@ import { Card } from "@/components/ui/card";
 import { loginFn, signupFn } from "@/lib/auth/server";
 import {
   buildOAuthRedirectUrl,
+  createAuthenticatedUserRedirect,
   isServerHandledAuthPath,
   normalizeAuthRedirectPath,
 } from "@/lib/auth/redirect-path";
@@ -28,7 +29,7 @@ export const Route = createFileRoute("/login")({
   }),
   beforeLoad: ({ context, search }) => {
     if (context.user) {
-      throw redirect({ to: normalizeAuthRedirectPath(search.redirect) });
+      throw redirect(createAuthenticatedUserRedirect(search.redirect));
     }
   },
   head: () => ({

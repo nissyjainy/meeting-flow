@@ -3,12 +3,17 @@ import {
   createExtensionAuthCode,
   isValidExtensionRedirectUri,
 } from "@/lib/extension/auth-handshake.server";
+import { buildExtensionAuthRedirectUriCookie } from "@/lib/extension/extension-auth-redirect";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
-function redirectResponse(location: string, status = 302): Response {
+function redirectResponse(location: string, cookies: string[] = []): Response {
+  const headers = new Headers({ Location: location });
+  for (const cookie of cookies) {
+    headers.append("Set-Cookie", cookie);
+  }
   return new Response(null, {
-    status,
-    headers: new Headers({ Location: location }),
+    status: 302,
+    headers,
   });
 }
 
@@ -34,7 +39,9 @@ export const Route = createFileRoute("/extension/auth")({
           const extensionAuthPath = `/extension/auth?redirect_uri=${encodeURIComponent(redirectUri)}`;
           const loginUrl = new URL("/login", origin);
           loginUrl.searchParams.set("redirect", extensionAuthPath);
-          return redirectResponse(loginUrl.toString());
+          return redirectResponse(loginUrl.toString(), [
+            buildExtensionAuthRedirectUriCookie(redirectUri),
+          ]);
         }
 
         const expiresAt =
