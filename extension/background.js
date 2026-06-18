@@ -5,6 +5,8 @@ importScripts(
   "meeting-session.js",
   "meeting-metadata.js",
   "recording-finalize.js",
+  "auth-errors.js",
+  "pending-uploads.js",
 );
 
 const LOG_PREFIX = "[meetflow-capture]";
@@ -62,9 +64,14 @@ async function setLastCaptureStatus(status) {
   await extensionStorageSet({ lastCaptureStatus: status }, "background");
 }
 
-async function refreshAuthToken(config, session) {
+async function clearAuthSession() {
+  await extensionStorageRemove(["authSession"], "background");
+}
+
+async function refreshAuthToken(config, session, options = {}) {
+  const force = Boolean(options.force);
   if (!session?.refreshToken) return session;
-  if (session.expiresAt && session.expiresAt > Date.now() + 60_000) return session;
+  if (!force && session.expiresAt && session.expiresAt > Date.now() + 60_000) return session;
 
   const meetflowUrl = (config.meetflowUrl ?? DEFAULT_CONFIG.meetflowUrl).replace(/\/$/, "");
   const res = await fetch(`${meetflowUrl}/api/extension/auth/refresh`, {
@@ -75,7 +82,11 @@ async function refreshAuthToken(config, session) {
 
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(body.error || "Session expired. Sign in again.");
+    const raw = body.error || "Session expired. Sign in again.";
+    if (isAuthSessionError(raw)) {
+      await clearAuthSession();
+    }
+    throw new Error(raw);
   }
 
   const next = {
@@ -88,6 +99,21 @@ async function refreshAuthToken(config, session) {
   };
   await extensionStorageSet({ authSession: next }, "background");
   return next;
+}
+
+async function validateUploadSession() {
+  try {
+    await getUploadSession({ force: true });
+    return { ok: true };
+  } catch (error) {
+    const raw = error instanceof Error ? error.message : String(error);
+    const sessionCleared = isAuthSessionError(raw);
+    return {
+      ok: false,
+      error: formatAuthErrorForCapture(raw),
+      sessionCleared,
+    };
+  }
 }
 
 async function ensureOffscreenDocument() {
@@ -130,7 +156,7 @@ async function uploadRecordingInBackground({
     throw new Error("Sign in before uploading.");
   }
 
-  const session = await refreshAuthToken(config, initialSession);
+  const session = await refreshAuthToken(config, initialSession, { force: true });
   const blob = new Blob([arrayBuffer], { type: mimeType || "audio/webm" });
   const file = new File([blob], fileName, { type: mimeType || "audio/webm" });
 
@@ -162,7 +188,8 @@ async function uploadRecordingInBackground({
 
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(body.error || `Upload failed (HTTP ${res.status}).`);
+    const raw = body.error || `Upload failed (HTTP ${res.status}).`;
+    throw new Error(formatAuthErrorForUpload(raw));
   }
 
   const record = {
@@ -185,16 +212,96 @@ async function uploadRecordingInBackground({
   return record;
 }
 
-async function getUploadSession() {
+async function getUploadSession(options = {}) {
   const { config, session: initialSession } = await getSession();
   if (!initialSession?.accessToken) {
     throw new Error("Sign in before uploading.");
   }
 
-  const session = await refreshAuthToken(config, initialSession);
+  const session = await refreshAuthToken(config, initialSession, options);
   return {
     accessToken: session.accessToken,
     uploadUrl: `${config.meetflowUrl.replace(/\/$/, "")}/api/extension/meeting-upload`,
+  };
+}
+
+async function retryPendingUpload() {
+  const pending = await getPendingUpload();
+  if (!pending?.blob) {
+    throw new Error("No recording waiting to upload.");
+  }
+
+  const { config, session: initialSession } = await getSession();
+  if (!initialSession?.accessToken) {
+    throw new Error("Sign in before uploading.");
+  }
+
+  const session = await refreshAuthToken(config, initialSession, { force: true });
+  const mimeType = pending.mimeType || "video/webm";
+  const blob = pending.blob;
+  const file = new File([blob], pending.fileName, { type: mimeType });
+
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("fileName", pending.fileName);
+  appendCaptureMetadata(formData, {
+    meetUrl: pending.meetUrl,
+    tabTitle: pending.tabTitle ?? pending.meetTitle,
+    meetTitle: pending.meetTitle,
+    platform: pending.platform,
+    meetCode: pending.meetCode,
+  });
+
+  const uploadUrl = `${config.meetflowUrl.replace(/\/$/, "")}/api/extension/meeting-upload`;
+  log("retry pending upload POST", { fileName: pending.fileName, bytes: blob.size });
+
+  const res = await fetch(uploadUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${session.accessToken}`,
+    },
+    body: formData,
+  });
+
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const raw = body.error || `Upload failed (HTTP ${res.status}).`;
+    throw new Error(formatAuthErrorForUpload(raw));
+  }
+
+  await clearPendingUpload();
+
+  const record = await saveUploadSuccessRecord({
+    meetingId: body.meetingId,
+    fileName: body.fileName ?? pending.fileName,
+    meetUrl: body.meetUrl ?? pending.meetUrl ?? null,
+    meetTitle: body.meetTitle ?? pending.meetTitle ?? null,
+    capturedAt: pending.capturedAt ?? body.capturedAt ?? new Date().toISOString(),
+    viewUrl: body.viewUrl ?? null,
+    bytes: blob.size,
+    diagnostics: pending.diagnostics ?? null,
+    partial: false,
+  });
+
+  log("retry pending upload success", { meetingId: body.meetingId, bytes: blob.size });
+  return record;
+}
+
+function serializePendingUploadMeta(pending) {
+  if (!pending) return null;
+  return {
+    id: pending.id,
+    fileName: pending.fileName,
+    mimeType: pending.mimeType,
+    bytes: pending.bytes,
+    capturedAt: pending.capturedAt,
+    meetUrl: pending.meetUrl,
+    meetTitle: pending.meetTitle,
+    tabTitle: pending.tabTitle,
+    platform: pending.platform,
+    meetCode: pending.meetCode,
+    error: pending.error,
+    diagnostics: pending.diagnostics,
   };
 }
 
@@ -227,6 +334,7 @@ async function saveUploadSuccessRecord(message) {
 }
 
 async function saveUploadFailureRecord(message) {
+  const formattedError = formatAuthErrorForUpload(message.error ?? "Upload failed.");
   const failedRecord = {
     id: crypto.randomUUID(),
     fileName: message.fileName,
@@ -235,13 +343,17 @@ async function saveUploadFailureRecord(message) {
     capturedAt: new Date().toISOString(),
     uploadedAt: new Date().toISOString(),
     uploadStatus: "failed",
-    error: message.error,
+    error: formattedError,
     bytes: message.bytes ?? 0,
     diagnostics: message.diagnostics ?? null,
+    pendingSaved: Boolean(message.pendingSaved),
   };
 
   await saveRecordingRecord(failedRecord);
-  await setLastCaptureStatus(message.error);
+  const status = message.pendingSaved
+    ? `${formattedError} Recording saved locally — use Retry Upload after signing in.`
+    : formattedError;
+  await setLastCaptureStatus(status);
   return failedRecord;
 }
 
@@ -593,6 +705,16 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           return;
         }
 
+        const validation = await validateUploadSession();
+        if (!validation.ok) {
+          sendResponse({
+            ok: false,
+            error: validation.error,
+            sessionCleared: validation.sessionCleared,
+          });
+          return;
+        }
+
         const result = await sendToOffscreen({
           type: "BEGIN_RECORDING",
           streamId: message.streamId,
@@ -776,13 +898,66 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
+  if (message?.type === "VALIDATE_UPLOAD_SESSION") {
+    void (async () => {
+      const validation = await validateUploadSession();
+      sendResponse(validation);
+    })();
+    return true;
+  }
+
   if (message?.type === "GET_UPLOAD_SESSION") {
     void (async () => {
       try {
-        const session = await getUploadSession();
+        const session = await getUploadSession({ force: Boolean(message.force) });
         sendResponse({ ok: true, ...session });
       } catch (error) {
         logError("GET_UPLOAD_SESSION failed", error);
+        const raw = error instanceof Error ? error.message : String(error);
+        sendResponse({
+          ok: false,
+          error: formatAuthErrorForUpload(raw),
+          sessionCleared: isAuthSessionError(raw),
+        });
+      }
+    })();
+    return true;
+  }
+
+  if (message?.type === "GET_PENDING_UPLOAD") {
+    void (async () => {
+      try {
+        const pending = await getPendingUpload();
+        sendResponse({ ok: true, pending: serializePendingUploadMeta(pending) });
+      } catch (error) {
+        logError("GET_PENDING_UPLOAD failed", error);
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      }
+    })();
+    return true;
+  }
+
+  if (message?.type === "RETRY_PENDING_UPLOAD") {
+    void (async () => {
+      try {
+        const record = await retryPendingUpload();
+        sendResponse({ ok: true, record });
+      } catch (error) {
+        logError("RETRY_PENDING_UPLOAD failed", error);
+        const raw = error instanceof Error ? error.message : String(error);
+        sendResponse({ ok: false, error: formatAuthErrorForUpload(raw) });
+      }
+    })();
+    return true;
+  }
+
+  if (message?.type === "CLEAR_PENDING_UPLOAD") {
+    void (async () => {
+      try {
+        await clearPendingUpload();
+        sendResponse({ ok: true });
+      } catch (error) {
+        logError("CLEAR_PENDING_UPLOAD failed", error);
         sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) });
       }
     })();
@@ -831,11 +1006,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         sendResponse({ ok: true, record });
       } catch (error) {
         logError("background upload failed", error);
+        const raw = error instanceof Error ? error.message : String(error);
         const failedRecord = await saveUploadFailureRecord({
           fileName: message.fileName,
           meetUrl: message.meetUrl ?? null,
           meetTitle: message.meetTitle ?? null,
-          error: error instanceof Error ? error.message : String(error),
+          error: formatAuthErrorForUpload(raw),
           bytes: message.bytes ?? 0,
           diagnostics: message.diagnostics ?? null,
         });

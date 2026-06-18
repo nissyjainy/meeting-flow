@@ -8,6 +8,10 @@ const signInBtn = $("sign-in-btn");
 const signOutBtn = $("sign-out-btn");
 const captureSection = $("capture-section");
 const recordingsSection = $("recordings-section");
+const pendingUploadSection = $("pending-upload-section");
+const pendingUploadStatusEl = $("pending-upload-status");
+const retryUploadBtn = $("retry-upload-btn");
+const discardPendingBtn = $("discard-pending-btn");
 
 const meetStatusEl = $("meet-status");
 const micStatusEl = $("mic-status");
@@ -54,6 +58,77 @@ function setProgress(percent) {
 
 function setCaptureStatus(text) {
   captureStatusEl.textContent = text;
+}
+
+function formatBytes(bytes) {
+  if (!bytes || bytes < 1) return "0 B";
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+async function refreshPendingUploadUi() {
+  const res = await sendMessage({ type: "GET_PENDING_UPLOAD" });
+  const pending = res?.ok ? res.pending : null;
+  const hasPending = Boolean(pending);
+
+  pendingUploadSection.classList.toggle("hidden", !hasPending);
+  if (!hasPending) {
+    pendingUploadStatusEl.textContent = "";
+    return null;
+  }
+
+  const when = new Date(pending.capturedAt).toLocaleString();
+  const size = formatBytes(pending.bytes);
+  const err = pending.error ? ` ${pending.error}` : "";
+  pendingUploadStatusEl.textContent = `${when} · ${pending.fileName} (${size}).${err}`;
+
+  const { session } = await getSession();
+  retryUploadBtn.disabled = !session?.accessToken;
+  return pending;
+}
+
+async function retryPendingUpload() {
+  const { session } = await getSession();
+  if (!session?.accessToken) {
+    setCaptureStatus("Sign in before retrying upload.");
+    return;
+  }
+
+  retryUploadBtn.disabled = true;
+  setCaptureStatus("Uploading saved recording…");
+  setProgress(30);
+
+  try {
+    const res = await sendMessage({ type: "RETRY_PENDING_UPLOAD" });
+    if (!res?.ok) {
+      throw new Error(res?.error || "Retry upload failed.");
+    }
+    setProgress(100);
+    setCaptureStatus(`Upload complete. Meeting ${res.record?.meetingId ?? "saved"}.`);
+    await refreshPendingUploadUi();
+    await refreshRecordings();
+  } catch (error) {
+    logError("retryPendingUpload failed", error);
+    const message = error instanceof Error ? error.message : "Retry upload failed.";
+    setCaptureStatus(formatAuthErrorForUpload(message));
+    await refreshPendingUploadUi();
+  } finally {
+    retryUploadBtn.disabled = false;
+  }
+}
+
+async function discardPendingUpload() {
+  discardPendingBtn.disabled = true;
+  try {
+    await sendMessage({ type: "CLEAR_PENDING_UPLOAD" });
+    setCaptureStatus("Discarded saved recording.");
+    await refreshPendingUploadUi();
+  } catch (error) {
+    logError("discardPendingUpload failed", error);
+    setCaptureStatus(error instanceof Error ? error.message : "Could not discard saved recording.");
+  } finally {
+    discardPendingBtn.disabled = false;
+  }
 }
 
 const MIC_STATUS_LABELS = {
@@ -266,6 +341,10 @@ async function signInWithMeetFlow() {
 
     setCaptureStatus("Signed in with MeetFlow.");
     await initUi();
+    const pending = await refreshPendingUploadUi();
+    if (pending) {
+      setCaptureStatus("Signed in. You can retry your saved recording upload.");
+    }
   } catch (error) {
     logError("signInWithMeetFlow failed", error);
     setCaptureStatus(error instanceof Error ? error.message : "MeetFlow sign in failed.");
@@ -444,6 +523,15 @@ async function startCapture() {
     return;
   }
 
+  const validation = await sendMessage({ type: "VALIDATE_UPLOAD_SESSION" });
+  if (!validation?.ok) {
+    setCaptureStatus(validation.error || "Please sign in again.");
+    if (validation.sessionCleared) {
+      await initUi();
+    }
+    return;
+  }
+
   setCaptureStatus("Starting offscreen capture…");
   setProgress(0);
 
@@ -462,6 +550,9 @@ async function startCapture() {
     title: activeMeeting.title,
   });
   if (!res?.ok) {
+    if (res?.sessionCleared) {
+      await initUi();
+    }
     throw new Error(res?.error || "Could not start recording.");
   }
 
@@ -482,6 +573,7 @@ async function stopCapture() {
   startBtn.disabled = false;
   stopBtn.disabled = true;
   await syncCaptureControls();
+  await refreshPendingUploadUi();
   await refreshRecordings();
 }
 
@@ -501,16 +593,23 @@ async function resetExtensionState() {
 async function initUi() {
   const { session } = await getSession();
   updateAuthControls(session);
+  const pending = await refreshPendingUploadUi();
 
   if (!session?.accessToken) {
     showSections({ auth: true, capture: false, recordings: true });
-    setCaptureStatus("Sign in with MeetFlow to record and upload.");
+    if (pending) {
+      setCaptureStatus("Sign in with MeetFlow to retry your saved recording upload.");
+    } else {
+      setCaptureStatus("Sign in with MeetFlow to record and upload.");
+    }
     await refreshRecordings();
     return;
   }
 
   showSections({ auth: true, capture: true, recordings: true });
-  if (!captureStatusEl.textContent) {
+  if (pending && !captureStatusEl.textContent) {
+    setCaptureStatus("Saved recording ready — use Retry Upload.");
+  } else if (!captureStatusEl.textContent) {
     setCaptureStatus(session.email ? `Signed in as ${session.email}` : "Signed in with MeetFlow.");
   }
   await Promise.all([refreshMeetingTabStatus(), refreshMicPermissionStatus(), refreshRecordings()]);
@@ -546,6 +645,14 @@ resetStateBtn.addEventListener("click", () => {
     setCaptureStatus(error instanceof Error ? error.message : "Could not reset extension state.");
     void syncCaptureControls();
   });
+});
+
+retryUploadBtn.addEventListener("click", () => {
+  void retryPendingUpload();
+});
+
+discardPendingBtn.addEventListener("click", () => {
+  void discardPendingUpload();
 });
 
 chrome.runtime.onMessage.addListener((message) => {

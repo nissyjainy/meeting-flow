@@ -263,7 +263,7 @@ async function uploadRecordingBlob({
 }) {
   await validateWebmBlob(blob, diagnostics.blobSize);
 
-  const sessionRes = await chrome.runtime.sendMessage({ type: "GET_UPLOAD_SESSION" });
+  const sessionRes = await chrome.runtime.sendMessage({ type: "GET_UPLOAD_SESSION", force: true });
   if (!sessionRes?.ok) {
     throw new Error(sessionRes?.error || "Could not get upload session.");
   }
@@ -298,7 +298,8 @@ async function uploadRecordingBlob({
 
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(body.error || `Upload failed (HTTP ${res.status}).`);
+    const raw = body.error || `Upload failed (HTTP ${res.status}).`;
+    throw new Error(formatAuthErrorForUpload(raw));
   }
 
   const notifyRes = await chrome.runtime.sendMessage({
@@ -396,7 +397,28 @@ async function finalizeFromChunks({ reason = finalize.FINALIZE_REASON.MANUAL } =
       });
       return { ok: true };
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const raw = error instanceof Error ? error.message : String(error);
+      const message = formatAuthErrorForUpload(raw);
+      let pendingSaved = false;
+      try {
+        await savePendingUpload({
+          blob,
+          fileName,
+          mimeType: blob.type || recorderMimeType,
+          bytes: blob.size,
+          capturedAt: new Date().toISOString(),
+          meetUrl,
+          meetTitle,
+          tabTitle: meetMeta?.tabTitle ?? meetTitle,
+          platform: meetMeta?.platform ?? null,
+          meetCode: meetMeta?.meetCode ?? null,
+          diagnostics,
+          error: message,
+        });
+        pendingSaved = true;
+      } catch (saveError) {
+        logError("save pending upload failed", saveError);
+      }
       await chrome.runtime.sendMessage({
         type: "UPLOAD_FAILED",
         fileName,
@@ -405,6 +427,7 @@ async function finalizeFromChunks({ reason = finalize.FINALIZE_REASON.MANUAL } =
         meetUrl,
         meetTitle,
         bytes: blob.size,
+        pendingSaved,
       });
       throw error;
     }
